@@ -12,6 +12,12 @@ let aiSelection = null;
 let toastTimer;
 let autoSaveInFlight = null;
 const AUTO_SAVE_INTERVAL = 120000;
+const SUPABASE_URL = "https://prpeqoezuopbdavrdayx.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_WzWryqw77bddiem0sfVCtw_pr5i3I0W";
+const CLOUD_PROJECT = "knut-thesis";
+let supabase = null;
+let cloudUser = null;
+let cloudSyncInFlight = false;
 let softWrap = localStorage.getItem("knut-soft-wrap") !== "false";
 let contextFile = "";
 let pdfLoadToken = 0;
@@ -24,6 +30,97 @@ const colorPresets={
 let editorColors={...colorPresets.paper};
 
 function toast(message) { const el=$("toast"); el.textContent=message; el.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove("show"),2600); }
+function setCloudStatus(message,type=""){ $("cloudStatus").textContent=message; $("cloudDot").className=`dot ${type}`; }
+function reportCloudError(error,context){
+  fetch("/api/cloud-diagnostic",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+    context,
+    message:error?.message||String(error),
+    code:error?.code||"",
+    details:error?.details||"",
+    hint:error?.hint||"",
+  })}).catch(()=>{});
+}
+function setCloudBusy(busy){
+  cloudSyncInFlight=busy;
+  ["uploadProjectBtn","downloadProjectBtn"].forEach(id=>$(id).disabled=busy);
+}
+function updateAccountView(){
+  $("signedOutView").classList.toggle("hidden",!!cloudUser);
+  $("signedInView").classList.toggle("hidden",!cloudUser);
+  $("accountBtn").textContent=cloudUser?`☁ ${cloudUser.email||"已登录"}`:"☁ 登录 / 同步";
+  if(cloudUser)$("accountEmail").textContent=cloudUser.email||cloudUser.id;
+}
+async function initCloud(){
+  try{
+    const {createClient}=await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm");
+    supabase=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+    const {data}=await supabase.auth.getSession(); cloudUser=data.session?.user||null; updateAccountView();
+    supabase.auth.onAuthStateChange((_event,session)=>{cloudUser=session?.user||null;updateAccountView();if(cloudUser)setCloudStatus("已登录，可同步","ok");});
+  }catch(error){
+    console.error("Supabase initialization failed",error);
+    $("accountBtn").title="当前无法连接云端，仍可正常使用本地编辑器";
+  }
+}
+async function emailLogin(){
+  if(!supabase)return toast("云端服务尚未连接，请检查网络");
+  const email=$("emailInput").value.trim(); if(!email)return toast("请输入邮箱地址");
+  const {error}=await supabase.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin}});
+  if(error)return toast(error.message);
+  toast("登录链接已发送，请检查邮箱"); setCloudStatus("等待邮箱确认","warn");
+}
+async function googleLogin(){
+  if(!supabase)return toast("云端服务尚未连接，请检查网络");
+  const {error}=await supabase.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin}});
+  if(error)toast(error.message);
+}
+async function signOut(){ if(!supabase)return; await supabase.auth.signOut(); cloudUser=null; updateAccountView(); setCloudStatus("已退出登录"); }
+async function cloudUpsertFiles(files,{quiet=false}={}){
+  if(!supabase||!cloudUser||!files.length)return false;
+  const rows=files.map(file=>({user_id:cloudUser.id,project_id:CLOUD_PROJECT,path:file.path,content:file.content,device_id:localDeviceId()}));
+  for(let index=0;index<rows.length;index+=5){
+    const {error}=await supabase.from("thesis_files").upsert(rows.slice(index,index+5),{onConflict:"user_id,project_id,path"});
+    if(error){
+      const detail=error.message||error.details||error.code||"未知错误";
+      reportCloudError(error,"upload");
+      if(!quiet)toast(`云同步失败：${detail}`);
+      setCloudStatus(`上传失败：${detail}`,"error");
+      return false;
+    }
+  }
+  setCloudStatus(`已同步 ${files.length} 个文件 · ${new Date().toLocaleTimeString()}`,"ok"); return true;
+}
+function localDeviceId(){
+  let id=localStorage.getItem("knut-device-id");
+  if(!id){id=crypto.randomUUID();localStorage.setItem("knut-device-id",id);}
+  return id;
+}
+async function uploadProject(){
+  if(!cloudUser)return toast("请先登录");
+  if(cloudSyncInFlight)return;
+  setCloudBusy(true);setCloudStatus("正在上传本机项目…","warn");
+  try{
+    await autoSave({silent:true});
+    const data=await api("/api/sync/export");
+    if(await cloudUpsertFiles(data.files))toast(`已上传 ${data.files.length} 个源文件`);
+  }catch(error){const detail=error.message||String(error);reportCloudError(error,"upload-exception");toast(detail);setCloudStatus(`上传失败：${detail}`,"error");}
+  finally{setCloudBusy(false);}
+}
+async function downloadProject(){
+  if(!cloudUser)return toast("请先登录");
+  if(cloudSyncInFlight)return;
+  setCloudBusy(true);setCloudStatus("正在读取云端项目…","warn");
+  try{
+    const {data,error}=await supabase.from("thesis_files").select("path,content,updated_at").eq("project_id",CLOUD_PROJECT).order("path");
+    if(error)throw error;
+    if(!data?.length)return toast("云端还没有论文文件，请先在原设备上传");
+    if(!window.confirm(`将用云端的 ${data.length} 个文件覆盖本机同名文件，并重新编译 PDF。是否继续？`))return;
+    const result=await api("/api/sync/import",{method:"POST",body:JSON.stringify({files:data,compile:true})});
+    activeFile="";original="";await loadFiles();handleCompile(result.compile);
+    setCloudStatus(`已下载 ${result.imported} 个文件 · ${new Date().toLocaleTimeString()}`,"ok");toast("云端论文已下载到本机");
+  }catch(error){toast(`下载失败：${error.message}`);setCloudStatus("下载失败","error");}
+  finally{setCloudBusy(false);}
+}
+async function cloudSaveCurrent(path,content){ if(cloudUser&&!cloudSyncInFlight)await cloudUpsertFiles([{path,content}],{quiet:true}); }
 function setStatus(message, type="") { $("status").textContent=message; $("saveDot").className=`dot ${type}`; }
 function applyEditorColors(colors,save=true){
   editorColors={...editorColors,...colors}; const root=document.documentElement;
@@ -150,6 +247,7 @@ async function autoSave({silent=false}={}){
     try{
       if(!silent)setStatus("正在自动保存…","warn");
       await api("/api/autosave",{method:"POST",body:JSON.stringify({path:fileAtStart,content:contentAtStart})});
+      await cloudSaveCurrent(fileAtStart,contentAtStart);
       if(activeFile===fileAtStart&&editor.value===contentAtStart){original=contentAtStart;setDirty();setStatus("已自动保存到本地","ok");}
       if(!silent)toast("已自动保存");
       return true;
@@ -167,7 +265,7 @@ function emergencySave(){
 }
 async function saveFile() {
   if(!activeFile) return toast("请先选择文件");
-  try { setStatus("正在保存并编译…","warn"); const data=await api("/api/file",{method:"PUT",body:JSON.stringify({path:activeFile,content:editor.value,compile:true})}); original=editor.value; setDirty(); handleCompile(data.compile); toast("已保存到本地文件"); }
+  try { setStatus("正在保存并编译…","warn"); const data=await api("/api/file",{method:"PUT",body:JSON.stringify({path:activeFile,content:editor.value,compile:true})}); original=editor.value; setDirty(); await cloudSaveCurrent(activeFile,editor.value); handleCompile(data.compile); toast(cloudUser?"已保存到本地并同步云端":"已保存到本地文件"); }
   catch(error){ setStatus("保存失败","error"); toast(error.message); }
 }
 function handleCompile(result) { if(!result) return; if(result.ok){ setStatus("已保存，PDF 编译成功","ok"); reloadPdf(); } else { setStatus(result.missing?"已保存，尚未安装编译器":"已保存，PDF 编译失败",result.missing?"warn":"error"); $("logText").textContent=result.log||"没有编译日志"; $("compileLog").classList.remove("hidden"); } }
@@ -310,9 +408,14 @@ document.addEventListener("keydown",event=>{if(event.key==="Escape")hideFileCont
 window.addEventListener("scroll",hideFileContextMenu,true);
 $("cancelAi").onclick=()=>{$("aiReview").classList.add("hidden");aiSelection=null;}; $("applyAi").onclick=applyAi; document.querySelectorAll(".ai-actions button").forEach(button=>button.onclick=()=>runAi(button.dataset.action));
 $("sendAiPrompt").onclick=runCustomAi; $("aiPrompt").addEventListener("keydown",event=>{if(event.key==="Enter"&&(event.ctrlKey||event.metaKey)){event.preventDefault();runCustomAi();}});
+$("accountBtn").onclick=()=>$("accountModal").classList.remove("hidden");
+$("closeAccountModal").onclick=()=>$("accountModal").classList.add("hidden");
+$("accountModal").addEventListener("click",event=>{if(event.target===$("accountModal"))$("accountModal").classList.add("hidden");});
+$("emailLoginBtn").onclick=emailLogin;$("googleLoginBtn").onclick=googleLogin;$("signOutBtn").onclick=signOut;
+$("uploadProjectBtn").onclick=uploadProject;$("downloadProjectBtn").onclick=downloadProject;
 setInterval(()=>autoSave(),AUTO_SAVE_INTERVAL);
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")emergencySave();});
 window.addEventListener("pagehide",emergencySave);
 window.addEventListener("beforeunload",e=>{if(editor.value!==original){emergencySave();e.preventDefault();e.returnValue="";}});
 window.addEventListener("resize",()=>{applyPaneRatio();syncHighlight();});
-loadEditorColors(); applySoftWrap(); setupPaneDivider(); reloadPdf(); loadFiles();
+loadEditorColors(); applySoftWrap(); setupPaneDivider(); initCloud(); reloadPdf(); loadFiles();

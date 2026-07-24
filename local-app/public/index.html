@@ -10,7 +10,7 @@
   <header class="topbar">
     <div class="brand"><span class="mark">K</span><div><strong>KNUT Thesis Studio</strong><small>本地论文工作台</small></div></div>
     <div class="document-status"><span id="saveDot" class="dot"></span><span id="status">正在连接本地项目…</span></div>
-    <div class="top-actions"><button id="colorSettingsBtn" class="button ghost">◐ 编辑器配色</button><button id="compileBtn" class="button ghost">编译 PDF</button><button id="saveBtn" class="button primary">保存并编译 <kbd>Ctrl S</kbd></button></div>
+    <div class="top-actions"><button id="accountBtn" class="button ghost">☁ 登录 / 同步</button><button id="colorSettingsBtn" class="button ghost">◐ 编辑器配色</button><button id="compileBtn" class="button ghost">编译 PDF</button><button id="saveBtn" class="button primary">保存并编译 <kbd>Ctrl S</kbd></button></div>
   </header>
 
   <section id="colorPanel" class="color-panel hidden" aria-label="编辑器配色设置">
@@ -77,6 +77,28 @@
     </section>
   </main>
   <div id="fileContextMenu" class="context-menu hidden" role="menu"><button id="renameFileBtn" role="menuitem"><span>✎</span>重命名文件</button></div>
+  <div id="accountModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="accountTitle">
+    <section class="account-card">
+      <div class="account-head"><div><strong id="accountTitle">账号与云同步</strong><span>同一账号可在不同设备同步论文源文件</span></div><button id="closeAccountModal" class="icon-button" aria-label="关闭">×</button></div>
+      <div id="signedOutView">
+        <label class="field-label" for="emailInput">邮箱地址</label>
+        <input id="emailInput" class="account-input" type="email" autocomplete="email" placeholder="name@example.com" />
+        <button id="emailLoginBtn" class="button primary wide">发送登录链接</button>
+        <div class="or-divider"><span>或</span></div>
+        <button id="googleLoginBtn" class="button wide">使用 Google 登录</button>
+        <p class="account-help">邮箱登录无需密码。首次使用时请在邮件中点击登录链接。</p>
+      </div>
+      <div id="signedInView" class="hidden">
+        <div class="user-row"><div><small>当前账号</small><strong id="accountEmail"></strong></div><button id="signOutBtn" class="button ghost">退出登录</button></div>
+        <div class="sync-state"><span id="cloudDot" class="dot"></span><span id="cloudStatus">尚未同步</span></div>
+        <div class="sync-actions">
+          <button id="uploadProjectBtn" class="button primary">上传本机项目</button>
+          <button id="downloadProjectBtn" class="button">下载云端项目</button>
+        </div>
+        <p class="account-help">本机保存后会自动上传当前文件。首次换设备时，请先使用“下载云端项目”。下载会覆盖本机同名源文件，并自动重新编译 PDF。</p>
+      </div>
+    </section>
+  </div>
   <div id="toast" class="toast"></div>
   <script type="module" src="/app.js"></script>
 </body>

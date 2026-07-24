@@ -125,3 +125,24 @@ body.resizing-panes,body.resizing-panes * { cursor:col-resize!important; user-se
 .context-menu button { width:100%; display:flex; align-items:center; gap:9px; border:0; border-radius:6px; padding:9px 10px; background:transparent; color:var(--ink); text-align:left; font-size:12px; }
 .context-menu button:hover { color:var(--green); background:var(--soft); }
 .context-menu button span { color:var(--green); }
+.modal-backdrop { position:fixed; z-index:80; inset:0; display:grid; place-items:center; padding:18px; background:rgba(12,25,19,.5); backdrop-filter:blur(3px); }
+.account-card { width:min(440px,100%); border:1px solid var(--line); border-radius:15px; background:#fff; box-shadow:0 24px 80px rgba(9,28,19,.3); overflow:hidden; }
+.account-head { display:flex; align-items:flex-start; justify-content:space-between; padding:17px 18px; border-bottom:1px solid var(--line); }
+.account-head div { display:flex; flex-direction:column; gap:4px; }
+.account-head strong { font-size:16px; }
+.account-head span { color:var(--muted); font-size:11px; }
+#signedOutView,#signedInView { padding:18px; }
+.field-label { display:block; margin-bottom:7px; color:#47534d; font-size:12px; font-weight:600; }
+.account-input { width:100%; height:42px; margin-bottom:10px; padding:0 12px; border:1px solid var(--line); border-radius:8px; outline:0; }
+.account-input:focus { border-color:#76a58f; box-shadow:0 0 0 3px rgba(45,118,90,.1); }
+.wide { width:100%; }
+.or-divider { display:flex; align-items:center; gap:10px; margin:13px 0; color:var(--muted); font-size:11px; }
+.or-divider::before,.or-divider::after { content:""; flex:1; height:1px; background:var(--line); }
+.account-help { margin:13px 0 0; color:var(--muted); font-size:11px; line-height:1.55; }
+.user-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border-radius:9px; background:var(--soft); }
+.user-row div { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.user-row strong { overflow:hidden; text-overflow:ellipsis; font-size:12px; }
+.sync-state { display:flex; align-items:flex-start; gap:8px; margin:16px 2px 12px; color:var(--muted); font-size:12px; line-height:1.45; overflow-wrap:anywhere; }
+.sync-state .dot { flex:none; margin-top:4px; }
+.sync-actions { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+.sync-actions button:disabled { opacity:.55; cursor:wait; }

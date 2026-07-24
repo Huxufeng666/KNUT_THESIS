@@ -315,3 +315,16 @@ sudo tlmgr install biber collection-fontsrecommended collection-langcjk collecti
 ## 许可证
 
 本项目采用 [MIT License](LICENSE)。
+# 账号登录与跨设备同步
+
+编辑器右上角新增了“登录 / 同步”入口，支持邮箱免密码登录和 Google 登录。
+
+1. 点击“登录 / 同步”。
+2. 输入邮箱并点击“发送登录链接”，然后在邮件中完成登录；也可以点击“使用 Google 登录”。
+3. 第一次在原电脑使用时，点击“上传本机项目”。
+4. 在另一台电脑登录同一账号后，点击“下载云端项目”。
+5. 登录状态下，每次本地保存或两分钟自动保存后，当前文件也会自动同步到云端。
+
+“下载云端项目”会覆盖本机同名的 `.tex`、`.bib`、`.sty` 和 `.cls` 文件，执行前会再次确认。PDF 是由每台电脑本地的 LaTeX 编译器生成，不上传到云端。
+
+云同步使用 Supabase。项目管理员首次部署时，需要在 Supabase SQL Editor 中执行 `supabase/setup.sql`，并在 Authentication → URL Configuration 中把 `http://127.0.0.1:4173` 设置为 Site URL 和允许的 Redirect URL。邮箱登录默认可用；Google 登录还需要在 Google Cloud 创建 OAuth Web Client，再把 Client ID 和 Client Secret 填入 Supabase Authentication → Providers → Google。

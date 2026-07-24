@@ -15,6 +15,7 @@ const publicDir = path.join(appDir, "public");
 const host = "127.0.0.1";
 const port = Number(process.env.PORT || 4173);
 const allowedExtensions = new Set([".tex", ".bib", ".sty", ".cls"]);
+let lastCloudDiagnostic = null;
 
 loadEnv(path.join(appDir, ".env"));
 
@@ -274,6 +275,41 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${host}:${port}`);
     if (req.method === "GET" && url.pathname === "/api/files") return json(res, 200, { files: await listFiles(), projectRoot });
+    if (req.method === "GET" && url.pathname === "/api/cloud-diagnostic") return json(res, 200, { diagnostic: lastCloudDiagnostic });
+    if (req.method === "POST" && url.pathname === "/api/cloud-diagnostic") {
+      const body = await readJson(req);
+      lastCloudDiagnostic = {
+        time: new Date().toISOString(),
+        context: String(body.context || ""),
+        message: String(body.message || ""),
+        code: String(body.code || ""),
+        details: String(body.details || ""),
+        hint: String(body.hint || ""),
+      };
+      return json(res, 200, { ok: true });
+    }
+    if (req.method === "GET" && url.pathname === "/api/sync/export") {
+      const files = [];
+      for (const relativePath of await listFiles()) {
+        files.push({ path: relativePath, content: await fs.readFile(safeProjectPath(relativePath), "utf8") });
+      }
+      return json(res, 200, { files });
+    }
+    if (req.method === "POST" && url.pathname === "/api/sync/import") {
+      const body = await readJson(req);
+      if (!Array.isArray(body.files) || body.files.length > 500) throw new Error("云端文件数据无效");
+      let imported = 0;
+      for (const item of body.files) {
+        const relativePath = String(item?.path || "").replaceAll("\\", "/");
+        const full = safeProjectPath(relativePath);
+        if (!allowedExtensions.has(path.extname(full).toLowerCase())) throw new Error(`不支持同步文件：${relativePath}`);
+        await fs.mkdir(path.dirname(full), { recursive: true });
+        await fs.writeFile(full, String(item?.content ?? ""), "utf8");
+        imported++;
+      }
+      const compile = body.compile === false ? null : await compileLatex();
+      return json(res, 200, { ok: true, imported, compile });
+    }
     if (req.method === "GET" && url.pathname === "/api/file") {
       const file = url.searchParams.get("path");
       const full = safeProjectPath(file);
