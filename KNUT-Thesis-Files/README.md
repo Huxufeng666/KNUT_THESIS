@@ -1,6 +1,6 @@
 # KNUT Thesis Studio
 
-这是一个适用于韩国国立交通大学（KNUT）学位论文的 LaTeX 模板，并附带一个可在 Windows 电脑本地运行的网页论文编辑器。
+这是一个适用于韩国国立交通大学（KNUT）学位论文的 LaTeX 模板，并附带一个可在 Windows 和 macOS 电脑本地运行的网页论文编辑器。
 
 编辑器会直接读取和修改项目中的真实 `.tex` 文件。保存并编译后，可以在网页右侧立即预览生成的 PDF。论文文件、API Key 和编辑内容默认都保存在本机。
 
@@ -17,6 +17,8 @@
 - AI 学术润色、扩写、精简、翻译英文和翻译中文
 
 ## 一、第一次启动（自动安装）
+
+### Windows
 
 下载完整仓库后，在最外层目录直接双击唯一的入口：
 
@@ -35,6 +37,27 @@ setup-knut-editor.vbs
 - Windows 10 1809 或更高版本，或 Windows 11；
 - 系统中可以使用 `winget`；
 - 电脑可以连接 Node.js 和 MiKTeX 的软件源。
+
+### macOS
+
+下载完整仓库后，在最外层目录双击：
+
+```text
+setup-knut-editor-mac.command
+```
+
+该入口会自动检查或安装 Homebrew、Node.js、BasicTeX、Biber、韩文/CJK 与模板需要的常用 LaTeX 宏包，然后启动本地服务并打开浏览器。
+
+首次安装可能要求输入 Mac 登录密码。终端输入密码时不会显示字符或圆点，这是 macOS 的正常安全行为，输入完成后按 Return。
+
+如果文件没有执行权限，在项目目录打开“终端”并执行：
+
+```bash
+chmod +x setup-knut-editor-mac.command
+./setup-knut-editor-mac.command
+```
+
+如果 macOS 显示安全拦截，请在 Finder 中按住 Control 点击该文件，选择“打开”，然后再次确认。日常启动仍使用同一个 `.command` 文件；依赖已经安装后不会重复下载。
 
 ## 二、手动安装（仅在自动安装失败时）
 
@@ -60,18 +83,32 @@ node --version
 
 编辑器使用 XeLaTeX 编译论文，并会在需要时运行 Biber。
 
+### 3. macOS 手动安装
+
+如果 Mac 自动安装失败，可以先安装 [Homebrew](https://brew.sh/)，再执行：
+
+```bash
+brew install node
+brew install --cask basictex
+export PATH="/Library/TeX/texbin:$PATH"
+sudo tlmgr update --self
+sudo tlmgr install biber collection-fontsrecommended collection-langcjk collection-latexextra collection-latexrecommended
+```
+
+完成后重新运行 `setup-knut-editor-mac.command`。
+
 ## 三、启动本地论文编辑器
 
 1. 下载或克隆本项目。
 2. 进入项目最外层目录。
-3. 双击 `setup-knut-editor.vbs`。
+3. Windows 双击 `setup-knut-editor.vbs`；macOS 双击 `setup-knut-editor-mac.command`。
 4. 稍等几秒，浏览器会自动打开：
 
 ```text
 http://127.0.0.1:4173
 ```
 
-首次安装会显示安装进度窗口。依赖已经安装后，入口只进行快速检查并自动打开网页。内部的 `start-knut-editor.vbs` 可直接启动编辑器，但普通用户不需要操作它。
+首次安装会显示安装进度窗口。依赖已经安装后，入口只进行快速检查并自动打开网页。Windows 内部的 `start-knut-editor.vbs` 可直接启动编辑器，但普通用户不需要操作它。
 
 如果浏览器没有自动打开，可以手动访问上面的地址。关闭启动的后台进程或重启电脑后，本地服务会停止。
 
@@ -199,6 +236,7 @@ AI 生成内容可能存在事实、引用或格式错误，正式提交论文�
 | `local-app/` | 本地网页编辑器程序。普通论文写作时不要修改其中的代码。 |
 | `KNUT-Thesis-Files/manuscript.pdf` | 最近一次成功编译生成的论文 PDF。编译失败时，右侧可能继续显示这个旧版本。 |
 | `setup-knut-editor.vbs` | 最外层的一键安装和启动入口，新用户与日常启动都双击此文件。 |
+| `setup-knut-editor-mac.command` | macOS 一键安装和启动入口，支持 Intel 与 Apple 芯片 Mac。 |
 
 ### 推荐修改顺序
 
@@ -246,6 +284,23 @@ AI 生成内容可能存在事实、引用或格式错误，正式提交论文�
 
 `winget` 由 Microsoft 的“应用安装程序（App Installer）”提供。请先从 Microsoft Store 更新“应用安装程序”，重启电脑后再双击 `setup-knut-editor.vbs`。由于这是 Windows 的系统组件，项目不应从非官方地址替用户下载安装。
 
+### Mac 提示找不到 `brew`、`node` 或 `xelatex`
+
+重新运行 `setup-knut-editor-mac.command`。如果刚安装完 BasicTeX 仍然找不到 `xelatex`，请重启 Mac 后再运行一次。也可以在终端执行：
+
+```bash
+export PATH="/Library/TeX/texbin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+```
+
+### Mac 提示 LaTeX 宏包缺失
+
+在终端执行：
+
+```bash
+sudo tlmgr update --self
+sudo tlmgr install biber collection-fontsrecommended collection-langcjk collection-latexextra collection-latexrecommended
+```
+
 ### 中文或韩文显示异常
 
 本项目使用 XeLaTeX。请确认系统中已安装论文需要的中文、韩文字体，并检查 LaTeX 文件中的字体配置是否与本机字体名称一致。
@@ -253,6 +308,7 @@ AI 生成内容可能存在事实、引用或格式错误，正式提交论文�
 ## 十一、安全说明
 
 - 本地服务默认只监听 `127.0.0.1`，供当前电脑使用。
+- Windows 和 macOS 使用同一个本地网页编辑器，论文文件不会因为操作系统不同而上传到外部服务器。
 - 不要把 `.env`、API Key 或其他密码提交到 GitHub。
 - 提交论文前请备份整个项目，并人工检查 PDF、引用、字体、页码和学校格式要求。
 

@@ -166,6 +166,9 @@ function findCommand(command) {
   const preferredFolders = [
     process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, "Programs", "MiKTeX", "miktex", "bin", "x64"),
     process.env.PROGRAMFILES && path.join(process.env.PROGRAMFILES, "MiKTeX", "miktex", "bin", "x64"),
+    process.platform === "darwin" && "/Library/TeX/texbin",
+    process.platform === "darwin" && "/opt/homebrew/bin",
+    process.platform === "darwin" && "/usr/local/bin",
   ].filter(Boolean);
   const pathValue = process.env.PATH || "";
   const extensions = process.platform === "win32" ? [".exe", ".cmd", ".bat", ""] : [""];
@@ -198,7 +201,14 @@ async function compileLatex() {
     return { ok: false, missing: true, log: "未检测到 LaTeX 编译器。请安装 MiKTeX，安装后重启本编辑器。当前已有 manuscript.pdf 仍可预览。" };
   }
 
-  const engineArgs = ["--enable-installer", "-synctex=1", "-interaction=nonstopmode", "-file-line-error", `-output-directory=${documentDirName}`, mainTexRelative];
+  const engineArgs = [
+    ...(process.platform === "win32" ? ["--enable-installer"] : []),
+    "-synctex=1",
+    "-interaction=nonstopmode",
+    "-file-line-error",
+    `-output-directory=${documentDirName}`,
+    mainTexRelative,
+  ];
   const logs = [];
   const first = await runProcess(engine, engineArgs);
   logs.push(first.log);
