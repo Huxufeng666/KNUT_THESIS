@@ -349,9 +349,20 @@ async function handleApi(req, res, url, root, user, access) {
   if (req.method === "POST" && url.pathname === "/api/synctex") {
     const body = await readJson(req);
     const page = Number(body.page), x = Number(body.x), y = Number(body.y);
+    if (!Number.isInteger(page) || page < 1 || !Number.isFinite(x) || !Number.isFinite(y)) {
+      throw new Error("无效的 PDF 点击位置");
+    }
     const synctex = findCommand("synctex");
     if (!synctex) throw new Error("服务器尚未安装 SyncTeX");
+    const synctexFile = path.join(root, documentDirName, "manuscript.synctex.gz");
+    if (!fsSync.existsSync(synctexFile)) {
+      const compile = await compileLatex(root);
+      if (!compile.ok || !fsSync.existsSync(synctexFile)) {
+        throw new Error(`无法生成反向定位数据：${compile.log || "请先成功编译 PDF"}`);
+      }
+    }
     const result = await runProcess(root, synctex, ["edit", "-o", `${page}:${x.toFixed(2)}:${y.toFixed(2)}:${mainPdfRelative}`], 15000);
+    if (!result.ok) throw new Error(result.log || "SyncTeX 定位失败");
     const inputMatch = result.log.match(/^Input:(.+)$/m);
     const lineMatch = result.log.match(/^Line:(\d+)$/m);
     if (!inputMatch || !lineMatch) throw new Error("此 PDF 位置没有对应源码");

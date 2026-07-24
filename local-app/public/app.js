@@ -396,7 +396,10 @@ async function reloadPdf(){
   const token=++pdfLoadToken,pages=$("pdfPages"),viewer=$("pdfViewer"),previousScroll=viewer.scrollTop;
   pages.innerHTML='<div class="pdf-loading">正在载入 PDF…</div>';
   try{
-    const documentTask=pdfjsLib.getDocument({url:`${demoMode?"/api/demo/pdf":"/api/pdf"}?t=${Date.now()}`,httpHeaders:cloudAccessToken?{Authorization:`Bearer ${cloudAccessToken}`}:{}}); const pdf=await documentTask.promise;
+    const pdfHeaders={};
+    if(cloudAccessToken)pdfHeaders.Authorization=`Bearer ${cloudAccessToken}`;
+    if(activeProjectId)pdfHeaders["X-Knut-Project"]=activeProjectId;
+    const documentTask=pdfjsLib.getDocument({url:`${demoMode?"/api/demo/pdf":"/api/pdf"}?t=${Date.now()}`,httpHeaders:pdfHeaders}); const pdf=await documentTask.promise;
     if(token!==pdfLoadToken)return; pages.innerHTML="";
     for(let pageNumber=1;pageNumber<=pdf.numPages;pageNumber++){
       const page=await pdf.getPage(pageNumber); if(token!==pdfLoadToken)return;
