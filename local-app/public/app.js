@@ -71,7 +71,7 @@ function fileIcon(file) { if(file.endsWith(".bib")) return "≡"; if(file.endsWi
 async function loadFiles() {
   try { const data=await api("/api/files"); $("projectPath").textContent=data.projectRoot; $("projectPath").title=data.projectRoot; const tree=$("fileTree"); tree.innerHTML="";
     data.files.forEach(file=>{ const button=document.createElement("button"); button.className=`file-item${file===activeFile?" active":""}`; button.dataset.file=file; button.innerHTML=`<span class="icon">${fileIcon(file)}</span><span>${file}</span>`; button.onclick=()=>openFile(file); button.oncontextmenu=event=>showFileContextMenu(event,file); tree.appendChild(button); });
-    setStatus("已连接本地项目","ok"); if(!activeFile&&data.files.includes("manuscript.tex")) openFile("manuscript.tex");
+    setStatus("已连接本地项目","ok"); if(!activeFile&&data.files.includes("KNUT-Thesis-Files/manuscript.tex")) openFile("KNUT-Thesis-Files/manuscript.tex");
   } catch(error){ setStatus(error.message,"error"); }
 }
 function showFileContextMenu(event,file){
@@ -82,7 +82,7 @@ function showFileContextMenu(event,file){
 function hideFileContextMenu(){ $("fileContextMenu").classList.add("hidden"); }
 async function renameContextFile(){
   hideFileContextMenu(); if(!contextFile)return;
-  if(contextFile.toLowerCase()==="manuscript.tex")return toast("manuscript.tex 是主入口，不能重命名");
+  if(contextFile.toLowerCase()==="knut-thesis-files/manuscript.tex")return toast("manuscript.tex 是主入口，不能重命名");
   if(activeFile===contextFile&&setDirty()&&!(await autoSave({silent:true})))return;
   const currentName=contextFile.split("/").pop(); const newName=window.prompt("请输入新的文件名（请保留扩展名）",currentName);
   if(newName===null||newName.trim()===currentName)return;

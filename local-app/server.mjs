@@ -7,6 +7,10 @@ import { spawn } from "node:child_process";
 
 const appDir = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(appDir, "..");
+const documentDirName = "KNUT-Thesis-Files";
+const documentDir = path.join(projectRoot, documentDirName);
+const mainTexRelative = `${documentDirName}/manuscript.tex`;
+const mainPdfRelative = `${documentDirName}/manuscript.pdf`;
 const publicDir = path.join(appDir, "public");
 const host = "127.0.0.1";
 const port = Number(process.env.PORT || 4173);
@@ -121,15 +125,15 @@ async function compileLatex() {
     return { ok: false, missing: true, log: "未检测到 LaTeX 编译器。请安装 MiKTeX，安装后重启本编辑器。当前已有 manuscript.pdf 仍可预览。" };
   }
 
-  const engineArgs = ["--enable-installer", "-synctex=1", "-interaction=nonstopmode", "-file-line-error", "manuscript.tex"];
+  const engineArgs = ["--enable-installer", "-synctex=1", "-interaction=nonstopmode", "-file-line-error", `-output-directory=${documentDirName}`, mainTexRelative];
   const logs = [];
   const first = await runProcess(engine, engineArgs);
   logs.push(first.log);
   if (!first.ok) return { ok: false, code: first.code, log: logs.join("\n").slice(-24000) };
 
-  const bibliography = path.join(projectRoot, "references.bib");
+  const bibliography = path.join(documentDir, "references.bib");
   if (biber && fsSync.existsSync(bibliography) && fsSync.statSync(bibliography).size > 0) {
-    const bibResult = await runProcess(biber, ["manuscript"]);
+    const bibResult = await runProcess(biber, [`${documentDirName}/manuscript`]);
     logs.push(bibResult.log);
     if (!bibResult.ok) return { ok: false, code: bibResult.code, log: logs.join("\n").slice(-24000) };
   }
@@ -211,7 +215,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readJson(req);
       const oldRelativePath = String(body.path || "").replaceAll("\\", "/");
       const newName = String(body.newName || "").trim();
-      if (oldRelativePath.toLowerCase() === "manuscript.tex") throw new Error("manuscript.tex 是论文主入口，不能重命名");
+      if (oldRelativePath.toLowerCase() === mainTexRelative.toLowerCase()) throw new Error("manuscript.tex 是论文主入口，不能重命名");
       if (!newName || newName === "." || newName === ".." || newName.includes("/") || newName.includes("\\")) throw new Error("请输入有效的新文件名，不能包含路径分隔符");
       const oldFull = safeProjectPath(oldRelativePath);
       const newRelativePath = path.posix.join(path.posix.dirname(oldRelativePath), newName);
@@ -230,7 +234,7 @@ const server = http.createServer(async (req, res) => {
       if (!Number.isInteger(page) || page < 1 || !Number.isFinite(x) || !Number.isFinite(y)) throw new Error("无效的 PDF 点击位置");
       const synctex = findCommand("synctex");
       if (!synctex) throw new Error("未检测到 SyncTeX 工具，请重新安装或更新 MiKTeX");
-      const result = await runProcess(synctex, ["edit", "-o", `${page}:${x.toFixed(2)}:${y.toFixed(2)}:manuscript.pdf`]);
+      const result = await runProcess(synctex, ["edit", "-o", `${page}:${x.toFixed(2)}:${y.toFixed(2)}:${mainPdfRelative}`]);
       if (!result.ok) throw new Error(result.log || "SyncTeX 定位失败");
       const inputMatch = result.log.match(/^Input:(.+)$/m);
       const lineMatch = result.log.match(/^Line:(\d+)$/m);
@@ -244,7 +248,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && url.pathname === "/api/compile") return json(res, 200, await compileLatex());
     if (req.method === "POST" && url.pathname === "/api/ai") return json(res, 200, { text: await aiEdit(await readJson(req)) });
     if (req.method === "GET" && url.pathname === "/api/pdf") {
-      const pdf = path.join(projectRoot, "manuscript.pdf");
+      const pdf = path.join(documentDir, "manuscript.pdf");
       const stat = await fs.stat(pdf);
       res.writeHead(200, { "Content-Type": "application/pdf", "Content-Length": stat.size, "Cache-Control": "no-store" });
       return fsSync.createReadStream(pdf).pipe(res);

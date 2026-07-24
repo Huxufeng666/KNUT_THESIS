@@ -5,7 +5,7 @@ Set shell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 
 rootDir = fso.GetParentFolderName(WScript.ScriptFullName)
-projectDir = fso.BuildPath(rootDir, "KNUT-Thesis-Studio")
+projectDir = fso.BuildPath(rootDir, "KNUT-Thesis-Files")
 scriptPath = fso.BuildPath(projectDir, "setup-knut-editor.ps1")
 startPath = fso.BuildPath(projectDir, "start-knut-editor.vbs")
 

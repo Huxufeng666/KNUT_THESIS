@@ -19,7 +19,8 @@ jobs:
     - name: Compile LaTeX document
       uses: xu-cheng/latex-action@v3
       with:
-        root_file: manuscript.tex 
+        root_file: KNUT-Thesis-Files/manuscript.tex
+        args: -xelatex -file-line-error -halt-on-error -interaction=nonstopmode -output-directory=KNUT-Thesis-Files
 
     - name: List files in the directory
       run: ls -la
@@ -30,13 +31,13 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: document
-        path: manuscript.pdf
+        path: KNUT-Thesis-Files/manuscript.pdf
 
     - name: Push PDF to main branch
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
-        git add manuscript.pdf
+        git add KNUT-Thesis-Files/manuscript.pdf
         git commit -m "Update compiled PDF" || echo "No changes to commit"
         git push "https://${GITHUB_ACTOR}:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
       env:

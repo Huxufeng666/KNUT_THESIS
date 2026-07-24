@@ -1,10 +1,11 @@
 Option Explicit
 
-Dim shell, fso, rootDir, appDir, url, isRunning, http, command
+Dim shell, fso, filesDir, rootDir, appDir, url, isRunning, http, command
 Set shell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 
-rootDir = fso.GetParentFolderName(WScript.ScriptFullName)
+filesDir = fso.GetParentFolderName(WScript.ScriptFullName)
+rootDir = fso.GetParentFolderName(filesDir)
 appDir = fso.BuildPath(rootDir, "local-app")
 url = "http://127.0.0.1:4173"
 isRunning = False
