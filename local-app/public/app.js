@@ -15,6 +15,7 @@ const AUTO_SAVE_INTERVAL = 120000;
 let softWrap = localStorage.getItem("knut-soft-wrap") !== "false";
 let contextFile = "";
 let pdfLoadToken = 0;
+let paneRatio = Math.min(.75,Math.max(.25,Number(localStorage.getItem("knut-pane-ratio"))||.5));
 const colorPresets={
   paper:{text:"#26332d",background:"#ffffff",gutter:"#fafbfa",command:"#6f35b4",comment:"#7d9186",brace:"#d16a16",math:"#b03075",number:"#1b67a5",optional:"#21835e",activeLine:"#f1f8f4"},
   eye:{text:"#33423b",background:"#f7f3e8",gutter:"#efeadc",command:"#6352a5",comment:"#778278",brace:"#b85c28",math:"#9f426d",number:"#25668d",optional:"#37785a",activeLine:"#e9f0df"},
@@ -32,6 +33,45 @@ function applyEditorColors(colors,save=true){
   if(save)localStorage.setItem("knut-editor-colors",JSON.stringify(editorColors));
 }
 function loadEditorColors(){ try{ const saved=JSON.parse(localStorage.getItem("knut-editor-colors")); applyEditorColors(saved&&typeof saved==="object"?saved:colorPresets.paper,false); }catch{ applyEditorColors(colorPresets.paper,false); } }
+function paneAvailableWidth(){
+  const workspace=$("workspace"),sidebar=workspace.querySelector(".sidebar"),divider=$("paneDivider");
+  return Math.max(0,workspace.clientWidth-sidebar.offsetWidth-divider.offsetWidth-30);
+}
+function applyPaneRatio(ratio=paneRatio,persist=false){
+  if(window.matchMedia("(max-width:1100px)").matches)return;
+  const available=paneAvailableWidth(); if(!available)return;
+  const minEditor=Math.min(320,available*.45),minPreview=Math.min(360,available*.45);
+  const editorWidth=Math.max(minEditor,Math.min(available-minPreview,available*ratio));
+  paneRatio=editorWidth/available;
+  $("workspace").style.setProperty("--editor-pane",`${editorWidth}px`);
+  $("paneDivider").setAttribute("aria-valuenow",String(Math.round(paneRatio*100)));
+  if(persist)localStorage.setItem("knut-pane-ratio",String(paneRatio));
+  syncHighlight();
+}
+function setupPaneDivider(){
+  const divider=$("paneDivider"),editorPanel=document.querySelector(".editor-panel");
+  let dragging=false;
+  const finish=()=>{
+    if(!dragging)return; dragging=false; divider.classList.remove("dragging"); document.body.classList.remove("resizing-panes");
+    localStorage.setItem("knut-pane-ratio",String(paneRatio)); reloadPdf();
+  };
+  divider.addEventListener("pointerdown",event=>{
+    if(event.button!==0)return; dragging=true; divider.classList.add("dragging"); document.body.classList.add("resizing-panes");
+    divider.setPointerCapture(event.pointerId); event.preventDefault();
+  });
+  divider.addEventListener("pointermove",event=>{
+    if(!dragging)return; const available=paneAvailableWidth(),left=editorPanel.getBoundingClientRect().left;
+    if(available)applyPaneRatio((event.clientX-left)/available);
+  });
+  divider.addEventListener("pointerup",finish); divider.addEventListener("pointercancel",finish);
+  divider.addEventListener("dblclick",()=>{paneRatio=.5;applyPaneRatio(paneRatio,true);reloadPdf();toast("已恢复左右默认比例");});
+  divider.addEventListener("keydown",event=>{
+    if(!["ArrowLeft","ArrowRight","Home"].includes(event.key))return; event.preventDefault();
+    paneRatio=event.key==="Home"?.5:paneRatio+(event.key==="ArrowLeft"?-.03:.03);
+    applyPaneRatio(paneRatio,true); reloadPdf();
+  });
+  applyPaneRatio();
+}
 function setDirty() { const dirty=editor.value!==original; $("dirtyBadge").classList.toggle("hidden",!dirty); if(dirty) setStatus("有未保存的修改","warn"); return dirty; }
 function escapeHtml(text){ return text.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;"); }
 function highlightLatex(text){
@@ -239,5 +279,5 @@ setInterval(()=>autoSave(),AUTO_SAVE_INTERVAL);
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")emergencySave();});
 window.addEventListener("pagehide",emergencySave);
 window.addEventListener("beforeunload",e=>{if(editor.value!==original){emergencySave();e.preventDefault();e.returnValue="";}});
-window.addEventListener("resize",syncHighlight);
-loadEditorColors(); applySoftWrap(); reloadPdf(); loadFiles();
+window.addEventListener("resize",()=>{applyPaneRatio();syncHighlight();});
+loadEditorColors(); applySoftWrap(); setupPaneDivider(); reloadPdf(); loadFiles();

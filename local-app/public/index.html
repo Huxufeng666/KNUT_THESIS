@@ -30,7 +30,7 @@
     <div class="color-panel-foot"><button id="resetColors" class="button ghost">恢复默认</button><span>设置自动保存在本机</span></div>
   </section>
 
-  <main class="workspace">
+  <main id="workspace" class="workspace">
     <aside class="sidebar panel">
       <div class="panel-title"><span>论文结构</span><button id="refreshBtn" class="icon-button" title="刷新文件">↻</button></div>
       <div id="projectPath" class="project-path"></div>
@@ -67,6 +67,8 @@
         <div class="review-actions"><button id="cancelAi" class="button ghost">取消</button><button id="applyAi" class="button primary">替换选中文字</button></div>
       </div>
     </section>
+
+    <div id="paneDivider" class="pane-divider" role="separator" aria-label="调整编辑器和 PDF 预览宽度" aria-orientation="vertical" aria-valuemin="25" aria-valuemax="75" aria-valuenow="50" tabindex="0" title="拖动调整左右宽度，双击恢复默认"></div>
 
     <section class="preview-panel panel">
       <div class="panel-title"><span>PDF 预览</span><div class="preview-actions"><button id="reloadPdf" class="icon-button" title="刷新预览">↻</button></div></div>

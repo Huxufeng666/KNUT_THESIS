@@ -20,7 +20,7 @@ small { color:var(--muted); font-size:11px; margin-top:2px; }
 .button.primary { color:white; border-color:var(--green); background:var(--green); }
 .button:hover { transform:translateY(-1px); }
 kbd { margin-left:8px; padding:2px 5px; border-radius:4px; background:rgba(255,255,255,.15); font-size:10px; }
-.workspace { height:calc(100vh - 68px); display:grid; grid-template-columns:230px minmax(380px,1fr) minmax(400px,1fr); gap:10px; padding:10px; }
+.workspace { --editor-pane:calc((100vw - 668px)/2); height:calc(100vh - 68px); display:grid; grid-template-columns:230px minmax(320px,var(--editor-pane)) 8px minmax(360px,1fr); gap:10px; padding:10px; }
 .panel { min-width:0; background:var(--white); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); overflow:hidden; }
 .panel-title,.editor-head { height:48px; display:flex; align-items:center; justify-content:space-between; padding:0 14px; border-bottom:1px solid var(--line); font-size:13px; font-weight:700; }
 .icon-button { border:0; background:transparent; color:var(--muted); font-size:19px; border-radius:6px; }
@@ -80,6 +80,10 @@ kbd { margin-left:8px; padding:2px 5px; border-radius:4px; background:rgba(255,2
 #aiResult { flex:1; resize:none; border:0; outline:0; padding:14px; font:12px/1.6 "Cascadia Code",Consolas,monospace; }
 .review-actions { display:flex; justify-content:flex-end; gap:8px; padding:9px; border-top:1px solid var(--line); }
 .preview-panel { display:flex; flex-direction:column; position:relative; }
+.pane-divider { position:relative; align-self:stretch; width:8px; border-radius:8px; cursor:col-resize; touch-action:none; outline:none; }
+.pane-divider::before { content:""; position:absolute; top:50%; left:2px; width:4px; height:54px; transform:translateY(-50%); border-radius:4px; background:#b8c4be; transition:.15s; }
+.pane-divider:hover::before,.pane-divider:focus-visible::before,.pane-divider.dragging::before { background:var(--green2); box-shadow:0 0 0 3px rgba(45,118,90,.13); }
+body.resizing-panes,body.resizing-panes * { cursor:col-resize!important; user-select:none!important; }
 .pdf-viewer { flex:1; min-height:0; overflow:auto; background:#252826; scroll-behavior:smooth; }
 .pdf-pages { min-height:100%; display:flex; flex-direction:column; align-items:center; gap:18px; padding:22px 28px 42px; }
 .pdf-page-shell { position:relative; flex:none; background:#fff; box-shadow:0 3px 16px rgba(0,0,0,.38); cursor:text; }
@@ -101,7 +105,7 @@ kbd { margin-left:8px; padding:2px 5px; border-radius:4px; background:rgba(255,2
 .compile-log pre { margin:0; padding:12px; overflow:auto; max-height:260px; white-space:pre-wrap; font:10px/1.5 Consolas,monospace; }
 .toast { position:fixed; left:50%; bottom:24px; transform:translate(-50%,20px); opacity:0; pointer-events:none; padding:10px 14px; color:white; background:#26332d; border-radius:8px; box-shadow:var(--shadow); font-size:12px; transition:.2s; }
 .toast.show { opacity:1; transform:translate(-50%,0); }
-@media (max-width:1100px) { .workspace { grid-template-columns:200px 1fr; } .preview-panel { display:none; } }
+@media (max-width:1100px) { .workspace { grid-template-columns:200px 1fr; } .preview-panel,.pane-divider { display:none; } }
 @media (max-width:700px) { body { overflow:auto; } .topbar { height:auto; grid-template-columns:1fr; gap:10px; padding:12px; } .document-status { order:3; } .top-actions { justify-content:flex-start; } .workspace { height:auto; grid-template-columns:1fr; } .sidebar { height:230px; } .editor-panel { height:calc(100vh - 220px); min-height:600px; } .ai-bar { align-items:flex-start; } .ai-label { min-width:auto; } .ai-custom-row { flex-wrap:wrap; } .ai-custom-row input { flex-basis:100%; } }
 .color-panel { position:fixed; z-index:30; top:62px; right:20px; width:340px; border:1px solid var(--line); border-radius:13px; background:#fff; box-shadow:0 18px 60px rgba(17,37,29,.22); overflow:hidden; }
 .color-panel-head { display:flex; justify-content:space-between; align-items:flex-start; padding:14px 16px 12px; border-bottom:1px solid var(--line); }
