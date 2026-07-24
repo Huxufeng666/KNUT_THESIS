@@ -14,6 +14,8 @@ let autoSaveInFlight = null;
 const AUTO_SAVE_INTERVAL = 120000;
 const SUPABASE_URL = "https://prpeqoezuopbdavrdayx.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_WzWryqw77bddiem0sfVCtw_pr5i3I0W";
+const AUTH_STORAGE_KEY = "knut-thesis-auth-session";
+const LEGACY_AUTH_STORAGE_KEY = "sb-prpeqoezuopbdavrdayx-auth-token";
 const CLOUD_PROJECT = "knut-thesis";
 let supabase = null;
 let cloudUser = null;
@@ -55,8 +57,20 @@ function updateAccountView(){
 async function initCloud(){
   try{
     const {createClient}=await import("/vendor/supabase/supabase.mjs");
-    supabase=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-    const {data}=await supabase.auth.getSession(); cloudUser=data.session?.user||null;cloudAccessToken=data.session?.access_token||"";updateAccountView();
+    if(!localStorage.getItem(AUTH_STORAGE_KEY)&&localStorage.getItem(LEGACY_AUTH_STORAGE_KEY)){
+      localStorage.setItem(AUTH_STORAGE_KEY,localStorage.getItem(LEGACY_AUTH_STORAGE_KEY));
+    }
+    supabase=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{
+      storage:window.localStorage,
+      storageKey:AUTH_STORAGE_KEY,
+      persistSession:true,
+      autoRefreshToken:true,
+      detectSessionInUrl:true,
+    }});
+    const {data,error}=await supabase.auth.getSession();
+    if(error)throw error;
+    cloudUser=data.session?.user||null;cloudAccessToken=data.session?.access_token||"";updateAccountView();
+    if(cloudUser)setCloudStatus("已恢复登录，可同步","ok");
     supabase.auth.onAuthStateChange((_event,session)=>{
       const wasSignedIn=!!cloudUser;
       cloudUser=session?.user||null;cloudAccessToken=session?.access_token||"";updateAccountView();
