@@ -14,7 +14,7 @@ const mainPdfRelative = `${documentDirName}/manuscript.pdf`;
 const publicDir = path.join(appDir, "public");
 const host = "127.0.0.1";
 const port = Number(process.env.PORT || 4173);
-const allowedExtensions = new Set([".tex", ".bib", ".md", ".txt", ".sty", ".cls"]);
+const allowedExtensions = new Set([".tex", ".bib", ".sty", ".cls"]);
 
 loadEnv(path.join(appDir, ".env"));
 

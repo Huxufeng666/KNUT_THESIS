@@ -68,9 +68,12 @@ function syncHighlight(){ highlightLatex(editor.value); highlightLayer.scrollTop
 async function api(url, options={}) { const response=await fetch(url,{...options,headers:{"Content-Type":"application/json",...(options.headers||{})}}); const data=await response.json(); if(!response.ok) throw new Error(data.error||"请求失败"); return data; }
 
 function fileIcon(file) { if(file.endsWith(".bib")) return "≡"; if(file.endsWith(".md")) return "◆"; return "T"; }
+function displayFileName(file) {
+  return file.startsWith("KNUT-Thesis-Files/") ? file.slice("KNUT-Thesis-Files/".length) : file;
+}
 async function loadFiles() {
   try { const data=await api("/api/files"); $("projectPath").textContent=data.projectRoot; $("projectPath").title=data.projectRoot; const tree=$("fileTree"); tree.innerHTML="";
-    data.files.forEach(file=>{ const button=document.createElement("button"); button.className=`file-item${file===activeFile?" active":""}`; button.dataset.file=file; button.innerHTML=`<span class="icon">${fileIcon(file)}</span><span>${file}</span>`; button.onclick=()=>openFile(file); button.oncontextmenu=event=>showFileContextMenu(event,file); tree.appendChild(button); });
+    data.files.forEach(file=>{ const button=document.createElement("button"); button.className=`file-item${file===activeFile?" active":""}`; button.dataset.file=file; button.title=file; button.innerHTML=`<span class="icon">${fileIcon(file)}</span><span>${displayFileName(file)}</span>`; button.onclick=()=>openFile(file); button.oncontextmenu=event=>showFileContextMenu(event,file); tree.appendChild(button); });
     setStatus("已连接本地项目","ok"); if(!activeFile&&data.files.includes("KNUT-Thesis-Files/manuscript.tex")) openFile("KNUT-Thesis-Files/manuscript.tex");
   } catch(error){ setStatus(error.message,"error"); }
 }
@@ -89,14 +92,14 @@ async function renameContextFile(){
   try{
     setStatus("正在重命名文件…","warn"); const oldPath=contextFile;
     const result=await api("/api/rename",{method:"POST",body:JSON.stringify({path:oldPath,newName:newName.trim()})});
-    if(activeFile===oldPath){activeFile=result.path;$("activeFile").textContent=result.path;}
+    if(activeFile===oldPath){activeFile=result.path;$("activeFile").textContent=displayFileName(result.path);}
     contextFile=""; await loadFiles(); setStatus("文件已重命名","ok");
     const referenceNote=result.updatedReferences?.length?`，并更新 ${result.updatedReferences.length} 个引用文件`:""; toast(`重命名成功${referenceNote}`);
   }catch(error){setStatus("重命名失败","error");toast(error.message);}
 }
 async function openFile(file) {
   if(setDirty()&&!(await autoSave({silent:true})))return;
-  try { setStatus("正在读取…"); const data=await api(`/api/file?path=${encodeURIComponent(file)}`); activeFile=file; original=data.content; editor.value=data.content; syncHighlight(); editor.disabled=false; $("activeFile").textContent=file; document.querySelectorAll(".file-item").forEach(el=>el.classList.toggle("active",el.dataset.file===file)); updateSelection(); setStatus("文件已载入","ok"); }
+  try { setStatus("正在读取…"); const data=await api(`/api/file?path=${encodeURIComponent(file)}`); activeFile=file; original=data.content; editor.value=data.content; syncHighlight(); editor.disabled=false; $("activeFile").textContent=displayFileName(file); document.querySelectorAll(".file-item").forEach(el=>el.classList.toggle("active",el.dataset.file===file)); updateSelection(); setStatus("文件已载入","ok"); }
   catch(error){ toast(error.message); setStatus("读取失败","error"); }
 }
 async function autoSave({silent=false}={}){
