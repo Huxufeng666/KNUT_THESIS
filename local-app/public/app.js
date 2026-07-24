@@ -23,6 +23,7 @@ let cloudAccessToken = "";
 let cloudSyncInFlight = false;
 let productionMode = false;
 let demoMode = false;
+let mobileView = localStorage.getItem("knut-mobile-view") || "files";
 let softWrap = localStorage.getItem("knut-soft-wrap") !== "false";
 let contextFile = "";
 let pdfLoadToken = 0;
@@ -63,6 +64,16 @@ function updateAccountView(){
   document.querySelectorAll(".ai-actions button").forEach(button=>button.disabled=demoMode);
   $("aiPrompt").disabled=demoMode;
   $("sendAiPrompt").disabled=demoMode;
+}
+function setMobileView(view,{persist=true}={}){
+  if(!["files","editor","pdf"].includes(view))view="files";
+  mobileView=view;
+  document.body.classList.remove("mobile-view-files","mobile-view-editor","mobile-view-pdf");
+  document.body.classList.add(`mobile-view-${view}`);
+  document.querySelectorAll("[data-mobile-view]").forEach(button=>button.classList.toggle("active",button.dataset.mobileView===view));
+  if(persist)localStorage.setItem("knut-mobile-view",view);
+  if(view==="pdf")setTimeout(()=>reloadPdf(),0);
+  if(view==="editor")setTimeout(()=>{syncHighlight();editor.focus({preventScroll:true});},0);
 }
 async function initCloud(){
   try{
@@ -277,7 +288,7 @@ async function renameContextFile(){
 }
 async function openFile(file) {
   if(setDirty()&&!(await autoSave({silent:true})))return;
-  try { setStatus("正在读取…"); const data=await api(`${demoMode?"/api/demo/file":"/api/file"}?path=${encodeURIComponent(file)}`); activeFile=file; original=data.content; editor.value=data.content; syncHighlight(); editor.disabled=false;editor.readOnly=demoMode; $("activeFile").textContent=`${displayFileName(file)}${demoMode?" · 只读":""}`; document.querySelectorAll(".file-item").forEach(el=>el.classList.toggle("active",el.dataset.file===file)); updateSelection(); setStatus(demoMode?"游客只读模板 · 登录后可编辑":"文件已载入",demoMode?"warn":"ok"); }
+  try { setStatus("正在读取…"); const data=await api(`${demoMode?"/api/demo/file":"/api/file"}?path=${encodeURIComponent(file)}`); activeFile=file; original=data.content; editor.value=data.content; syncHighlight(); editor.disabled=false;editor.readOnly=demoMode; $("activeFile").textContent=`${displayFileName(file)}${demoMode?" · 只读":""}`; document.querySelectorAll(".file-item").forEach(el=>el.classList.toggle("active",el.dataset.file===file)); updateSelection(); setStatus(demoMode?"游客只读模板 · 登录后可编辑":"文件已载入",demoMode?"warn":"ok"); if(matchMedia("(max-width:700px)").matches)setMobileView("editor"); }
   catch(error){ toast(error.message); setStatus("读取失败","error"); }
 }
 async function autoSave({silent=false}={}){
@@ -455,6 +466,7 @@ $("cancelAi").onclick=()=>{$("aiReview").classList.add("hidden");aiSelection=nul
 $("sendAiPrompt").onclick=runCustomAi; $("aiPrompt").addEventListener("keydown",event=>{if(event.key==="Enter"&&(event.ctrlKey||event.metaKey)){event.preventDefault();runCustomAi();}});
 $("accountBtn").onclick=()=>$("accountModal").classList.remove("hidden");
 $("welcomeLoginBtn").onclick=()=>$("accountModal").classList.remove("hidden");
+document.querySelectorAll("[data-mobile-view]").forEach(button=>button.onclick=()=>setMobileView(button.dataset.mobileView));
 $("closeAccountModal").onclick=()=>$("accountModal").classList.add("hidden");
 $("accountModal").addEventListener("click",event=>{if(event.target===$("accountModal"))$("accountModal").classList.add("hidden");});
 $("emailLoginBtn").onclick=emailLogin;$("googleLoginBtn").onclick=googleLogin;$("signOutBtn").onclick=signOut;
@@ -465,7 +477,7 @@ window.addEventListener("pagehide",emergencySave);
 window.addEventListener("beforeunload",e=>{if(editor.value!==original){emergencySave();e.preventDefault();e.returnValue="";}});
 window.addEventListener("resize",()=>{applyPaneRatio();syncHighlight();});
 async function boot(){
-  loadEditorColors();applySoftWrap();setupPaneDivider();
+  loadEditorColors();applySoftWrap();setupPaneDivider();setMobileView(mobileView,{persist:false});
   try{
     const response=await fetch("/api/config",{cache:"no-store"});
     if(response.ok)productionMode=(await response.json()).mode==="production";

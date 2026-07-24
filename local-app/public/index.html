@@ -12,6 +12,11 @@
     <div class="document-status"><span id="saveDot" class="dot"></span><span id="status">正在连接本地项目…</span></div>
     <div class="top-actions"><button id="accountBtn" class="button ghost">☁ 登录 / 同步</button><button id="colorSettingsBtn" class="button ghost">◐ 编辑器配色</button><button id="compileBtn" class="button ghost">编译 PDF</button><button id="saveBtn" class="button primary">保存并编译 <kbd>Ctrl S</kbd></button></div>
   </header>
+  <nav id="mobileNav" class="mobile-nav" aria-label="手机页面切换">
+    <button data-mobile-view="files" class="active">☰ 文件</button>
+    <button data-mobile-view="editor">✎ 编辑</button>
+    <button data-mobile-view="pdf">▣ PDF</button>
+  </nav>
 
   <section id="colorPanel" class="color-panel hidden" aria-label="编辑器配色设置">
     <div class="color-panel-head"><div><strong>编辑器配色</strong><span>选择预设或单独调整颜色</span></div><button id="closeColorPanel" class="icon-button" aria-label="关闭配色设置">×</button></div>
