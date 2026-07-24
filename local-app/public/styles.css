@@ -140,6 +140,8 @@ body.resizing-panes,body.resizing-panes * { cursor:col-resize!important; user-se
   .sidebar-note { display:none; }
   .code-editor { min-height:220px; }
   #editor,#highlightLayer { font-size:13px; line-height:1.7; }
+  #editor { color:var(--editor-text); -webkit-text-fill-color:var(--editor-text); }
+  #highlightLayer { display:none; }
   .ai-bar { min-height:126px; align-items:flex-start; padding:8px; }
   .ai-label { display:none; }
   .ai-actions { flex-wrap:nowrap; overflow-x:auto; padding-bottom:2px; }
