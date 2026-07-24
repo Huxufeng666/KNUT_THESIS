@@ -17,7 +17,9 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_WzWryqw77bddiem0sfVCtw_pr5i3I0W
 const CLOUD_PROJECT = "knut-thesis";
 let supabase = null;
 let cloudUser = null;
+let cloudAccessToken = "";
 let cloudSyncInFlight = false;
+let productionMode = false;
 let softWrap = localStorage.getItem("knut-soft-wrap") !== "false";
 let contextFile = "";
 let pdfLoadToken = 0;
@@ -54,8 +56,15 @@ async function initCloud(){
   try{
     const {createClient}=await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm");
     supabase=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-    const {data}=await supabase.auth.getSession(); cloudUser=data.session?.user||null; updateAccountView();
-    supabase.auth.onAuthStateChange((_event,session)=>{cloudUser=session?.user||null;updateAccountView();if(cloudUser)setCloudStatus("已登录，可同步","ok");});
+    const {data}=await supabase.auth.getSession(); cloudUser=data.session?.user||null;cloudAccessToken=data.session?.access_token||"";updateAccountView();
+    supabase.auth.onAuthStateChange((_event,session)=>{
+      const wasSignedIn=!!cloudUser;
+      cloudUser=session?.user||null;cloudAccessToken=session?.access_token||"";updateAccountView();
+      if(cloudUser){
+        setCloudStatus("已登录，可同步","ok");
+        if(!wasSignedIn){loadFiles();reloadPdf();}
+      }
+    });
   }catch(error){
     console.error("Supabase initialization failed",error);
     $("accountBtn").title="当前无法连接云端，仍可正常使用本地编辑器";
@@ -73,7 +82,7 @@ async function googleLogin(){
   const {error}=await supabase.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin}});
   if(error)toast(error.message);
 }
-async function signOut(){ if(!supabase)return; await supabase.auth.signOut(); cloudUser=null; updateAccountView(); setCloudStatus("已退出登录"); }
+async function signOut(){ if(!supabase)return; await supabase.auth.signOut(); cloudUser=null;cloudAccessToken="";updateAccountView();setCloudStatus("已退出登录");activeFile="";original="";editor.value="";syncHighlight(); }
 async function cloudUpsertFiles(files,{quiet=false}={}){
   if(!supabase||!cloudUser||!files.length)return false;
   const rows=files.map(file=>({user_id:cloudUser.id,project_id:CLOUD_PROJECT,path:file.path,content:file.content,device_id:localDeviceId()}));
@@ -202,7 +211,13 @@ function syncEditorChrome(){
   activeLine.style.height=`${rows[current-1]*22.1}px`;
 }
 function syncHighlight(){ highlightLatex(editor.value); highlightLayer.scrollTop=editor.scrollTop; highlightLayer.scrollLeft=editor.scrollLeft; syncEditorChrome(); }
-async function api(url, options={}) { const response=await fetch(url,{...options,headers:{"Content-Type":"application/json",...(options.headers||{})}}); const data=await response.json(); if(!response.ok) throw new Error(data.error||"请求失败"); return data; }
+async function api(url,options={}){
+  const headers={"Content-Type":"application/json",...(cloudAccessToken?{Authorization:`Bearer ${cloudAccessToken}`}:{}),...(options.headers||{})};
+  const response=await fetch(url,{...options,headers});
+  const data=await response.json();
+  if(!response.ok)throw new Error(data.error||"请求失败");
+  return data;
+}
 
 function fileIcon(file) { if(file.endsWith(".bib")) return "≡"; if(file.endsWith(".md")) return "◆"; return "T"; }
 function displayFileName(file) {
@@ -259,9 +274,9 @@ async function autoSave({silent=false}={}){
 function emergencySave(){
   if(!activeFile||editor.value===original)return false;
   const payload=JSON.stringify({path:activeFile,content:editor.value});
-  const queued=navigator.sendBeacon("/api/autosave",new Blob([payload],{type:"application/json"}));
-  if(queued)original=editor.value;
-  return queued;
+  fetch("/api/autosave",{method:"POST",headers:{"Content-Type":"application/json",...(cloudAccessToken?{Authorization:`Bearer ${cloudAccessToken}`}:{})},body:payload,keepalive:true}).catch(()=>{});
+  original=editor.value;
+  return true;
 }
 async function saveFile() {
   if(!activeFile) return toast("请先选择文件");
@@ -274,7 +289,7 @@ async function reloadPdf(){
   const token=++pdfLoadToken,pages=$("pdfPages"),viewer=$("pdfViewer"),previousScroll=viewer.scrollTop;
   pages.innerHTML='<div class="pdf-loading">正在载入 PDF…</div>';
   try{
-    const documentTask=pdfjsLib.getDocument({url:`/api/pdf?t=${Date.now()}`}); const pdf=await documentTask.promise;
+    const documentTask=pdfjsLib.getDocument({url:`/api/pdf?t=${Date.now()}`,httpHeaders:cloudAccessToken?{Authorization:`Bearer ${cloudAccessToken}`}:{}}); const pdf=await documentTask.promise;
     if(token!==pdfLoadToken)return; pages.innerHTML="";
     for(let pageNumber=1;pageNumber<=pdf.numPages;pageNumber++){
       const page=await pdf.getPage(pageNumber); if(token!==pdfLoadToken)return;
@@ -418,4 +433,14 @@ document.addEventListener("visibilitychange",()=>{if(document.visibilityState===
 window.addEventListener("pagehide",emergencySave);
 window.addEventListener("beforeunload",e=>{if(editor.value!==original){emergencySave();e.preventDefault();e.returnValue="";}});
 window.addEventListener("resize",()=>{applyPaneRatio();syncHighlight();});
-loadEditorColors(); applySoftWrap(); setupPaneDivider(); initCloud(); reloadPdf(); loadFiles();
+async function boot(){
+  loadEditorColors();applySoftWrap();setupPaneDivider();
+  try{
+    const response=await fetch("/api/config",{cache:"no-store"});
+    if(response.ok)productionMode=(await response.json()).mode==="production";
+  }catch{}
+  await initCloud();
+  if(!productionMode||cloudUser){reloadPdf();loadFiles();}
+  else{setStatus("请登录后打开论文项目","warn");$("pdfPages").innerHTML='<div class="pdf-loading">请先登录以载入个人论文 PDF</div>';}
+}
+boot();
