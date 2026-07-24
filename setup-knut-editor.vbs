@@ -1,14 +1,21 @@
 Option Explicit
 
-Dim shell, fso, rootDir, scriptPath, command, exitCode
+Dim shell, fso, rootDir, projectDir, scriptPath, startPath, command, exitCode
 Set shell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 
 rootDir = fso.GetParentFolderName(WScript.ScriptFullName)
-scriptPath = fso.BuildPath(rootDir, "setup-knut-editor.ps1")
+projectDir = fso.BuildPath(rootDir, "KNUT-Thesis-Studio")
+scriptPath = fso.BuildPath(projectDir, "setup-knut-editor.ps1")
+startPath = fso.BuildPath(projectDir, "start-knut-editor.vbs")
 
-If Not fso.FileExists(scriptPath) Then
-  MsgBox "The setup script is missing: " & scriptPath, 16, "KNUT Thesis Studio"
+If Not fso.FolderExists(projectDir) Then
+  MsgBox "The application folder is missing: " & projectDir, 16, "KNUT Thesis Studio"
+  WScript.Quit 1
+End If
+
+If Not fso.FileExists(scriptPath) Or Not fso.FileExists(startPath) Then
+  MsgBox "The application files are incomplete. Please download the complete repository again.", 16, "KNUT Thesis Studio"
   WScript.Quit 1
 End If
 
@@ -16,5 +23,5 @@ command = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File """ & scriptP
 exitCode = shell.Run(command, 1, True)
 
 If exitCode = 0 Then
-  shell.Run "wscript.exe """ & fso.BuildPath(rootDir, "start-knut-editor.vbs") & """", 1, False
+  shell.Run "wscript.exe """ & startPath & """", 1, False
 End If
