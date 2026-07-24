@@ -197,7 +197,7 @@ async function reloadPdf(){
       locateSelection.addEventListener("pointerdown",event=>event.stopPropagation());
       locateSelection.addEventListener("click",event=>{
         event.stopPropagation(); if(!selectionPoint)return;
-        locatePdfSource(pageNumber,selectionPoint.x,selectionPoint.y,shell,selectionPoint.text); locateSelection.classList.add("hidden");
+        locatePdfSource(pageNumber,selectionPoint.x,selectionPoint.y,shell,selectionPoint.text,selectionPoint.hint); locateSelection.classList.add("hidden");
       });
       shell.addEventListener("pointerdown",event=>{
         if(event.target.closest(".pdf-selection-locate"))return;
@@ -214,7 +214,13 @@ async function reloadPdf(){
           const rect=rects.at(-1); if(!rect)return;
           const centerX=Math.max(shellRect.left,Math.min(shellRect.right,(rect.left+rect.right)/2));
           const centerY=Math.max(shellRect.top,Math.min(shellRect.bottom,(rect.top+rect.bottom)/2));
-          selectionPoint={x:(centerX-shellRect.left)/shellRect.width*base.width,y:(centerY-shellRect.top)/shellRect.height*base.height,text:selection.toString().trim().slice(0,1000)};
+          const nearestSpan=[...textLayer.querySelectorAll("span")].map(span=>{
+            const spanRect=span.getBoundingClientRect();
+            const overlap=Math.max(0,Math.min(rect.right,spanRect.right)-Math.max(rect.left,spanRect.left))*Math.max(0,Math.min(rect.bottom,spanRect.bottom)-Math.max(rect.top,spanRect.top));
+            const distance=Math.hypot((spanRect.left+spanRect.right)/2-centerX,(spanRect.top+spanRect.bottom)/2-centerY);
+            return {span,score:overlap>0?overlap+100000:-distance};
+          }).sort((a,b)=>b.score-a.score)[0]?.span;
+          selectionPoint={x:(centerX-shellRect.left)/shellRect.width*base.width,y:(centerY-shellRect.top)/shellRect.height*base.height,text:selection.toString().trim().slice(0,1000),hint:(nearestSpan?.textContent||"").trim().slice(0,500)};
           locateSelection.style.left=`${Math.max(58,Math.min(shellRect.width-58,centerX-shellRect.left))}px`;
           locateSelection.style.top=`${Math.max(18,Math.min(shellRect.height-18,centerY-shellRect.top-28))}px`;
           locateSelection.classList.remove("hidden"); setStatus("已选择 PDF 文字，点击“定位源码”跳转","ok");
@@ -233,11 +239,12 @@ async function reloadPdf(){
     viewer.scrollTop=Math.min(previousScroll,viewer.scrollHeight-viewer.clientHeight); setStatus("PDF 已载入，可选择文字；单击可定位源码","ok");
   }catch(error){ if(token===pdfLoadToken){pages.innerHTML=`<div class="pdf-loading">PDF 载入失败：${escapeHtml(error.message)}</div>`;setStatus("PDF 载入失败","error");} }
 }
-async function locatePdfSource(page,x,y,shell,text=""){
+async function locatePdfSource(page,x,y,shell,text="",hint=""){
   try{
     setStatus(`正在定位 PDF 第 ${page} 页…`,"warn"); shell.style.outline="3px solid #4aa476";
-    const result=await api("/api/synctex",{method:"POST",body:JSON.stringify({page,x,y,text})});
-    await openFile(result.path); jumpToSourceLine(result.line); toast(`${result.method==="text"?"文字精确定位":"SyncTeX 定位"}：${result.path} 第 ${result.line} 行`); setStatus("已从 PDF 定位到源码","ok");
+    const result=await api("/api/synctex",{method:"POST",body:JSON.stringify({page,x,y,text,hint})});
+    const methodName=result.method==="macro"?"宏定义定位":result.method==="text"?"文字精确定位":"SyncTeX 定位";
+    await openFile(result.path); jumpToSourceLine(result.line); toast(`${methodName}：${result.path} 第 ${result.line} 行`); setStatus("已从 PDF 定位到源码","ok");
   }catch(error){toast(error.message);setStatus("此位置无法定位源码","error");}
   finally{setTimeout(()=>{shell.style.outline="";},700);}
 }

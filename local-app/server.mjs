@@ -120,6 +120,48 @@ async function findSelectedTextSource(selectedText, fallbackPath, fallbackLine) 
   return best;
 }
 
+async function findReferencedMacroDefinition(fallbackPath, fallbackLine, selectedText) {
+  let fallbackContent;
+  try { fallbackContent = await fs.readFile(safeProjectPath(fallbackPath), "utf8"); } catch { return null; }
+  const fallbackLines = fallbackContent.split(/\r?\n/);
+  const definitionMap = new Map();
+  for (const relativeFile of await listFiles()) {
+    if (!relativeFile.toLowerCase().endsWith(".tex")) continue;
+    let content;
+    try { content = await fs.readFile(safeProjectPath(relativeFile), "utf8"); } catch { continue; }
+    const lines = content.split(/\r?\n/);
+    lines.forEach((line, index) => {
+      const commandMatch = line.match(/\\(?:newcommand|renewcommand|providecommand)\s*\{?\s*\\([A-Za-z@]+)|\\def\s*\\([A-Za-z@]+)/);
+      const name = commandMatch?.[1] || commandMatch?.[2];
+      if (!name) return;
+      const entry = { name, path: relativeFile, line: index + 1, source: line };
+      const definitions = definitionMap.get(name) || [];
+      definitions.push(entry);
+      definitionMap.set(name, definitions);
+    });
+  }
+  const collectCandidates = (radius) => {
+    const start = Math.max(0, fallbackLine - 1 - radius);
+    const end = Math.min(fallbackLines.length, fallbackLine + radius);
+    const sourceWindow = fallbackLines.slice(start, end).join("\n");
+    const names = [...sourceWindow.matchAll(/\\([A-Za-z@]+)/g)].map(match => match[1]);
+    return names.flatMap(name => definitionMap.get(name) || []);
+  };
+  let candidates = collectCandidates(0);
+  if (!candidates.length) candidates = collectCandidates(1);
+  const unique = [...new Map(candidates.map(candidate => [`${candidate.path}:${candidate.line}`, candidate])).values()];
+  const sameFile = unique.filter(candidate => candidate.path.toLowerCase() === fallbackPath.toLowerCase());
+  if (sameFile.length === 1) return sameFile[0];
+  if (unique.length === 1) return unique[0];
+  const selectedKey = normalizeLocatorText(selectedText);
+  if (selectedKey.length >= 3) {
+    const matchingPool = sameFile.length ? sameFile : unique;
+    const matching = matchingPool.filter(candidate => normalizeLocatorText(candidate.source).includes(selectedKey));
+    if (matching.length === 1) return matching[0];
+  }
+  return null;
+}
+
 function findCommand(command) {
   const preferredFolders = [
     process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, "Programs", "MiKTeX", "miktex", "bin", "x64"),
@@ -275,12 +317,16 @@ const server = http.createServer(async (req, res) => {
       if (absoluteInput !== projectRoot && !absoluteInput.startsWith(projectRoot + path.sep)) throw new Error("定位结果不在当前论文项目中");
       const relativeInput = path.relative(projectRoot, absoluteInput).replaceAll(path.sep, "/");
       const synctexLine = Math.max(1, Number(lineMatch[1]));
-      const textMatch = await findSelectedTextSource(body.text, relativeInput, synctexLine);
+      let textMatch = await findSelectedTextSource(body.hint, relativeInput, synctexLine);
+      if (!textMatch && body.text && body.text !== body.hint) {
+        textMatch = await findSelectedTextSource(body.text, relativeInput, synctexLine);
+      }
+      const macroMatch = textMatch ? null : await findReferencedMacroDefinition(relativeInput, synctexLine, body.hint || body.text);
       return json(res, 200, {
         ok: true,
-        path: textMatch?.path || relativeInput,
-        line: textMatch?.line || synctexLine,
-        method: textMatch ? "text" : "synctex",
+        path: macroMatch?.path || textMatch?.path || relativeInput,
+        line: macroMatch?.line || textMatch?.line || synctexLine,
+        method: macroMatch ? "macro" : textMatch ? "text" : "synctex",
       });
     }
     if (req.method === "POST" && url.pathname === "/api/compile") return json(res, 200, await compileLatex());
