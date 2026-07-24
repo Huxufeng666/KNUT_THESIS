@@ -142,17 +142,27 @@ async function reloadPdf(){
       const page=await pdf.getPage(pageNumber); if(token!==pdfLoadToken)return;
       const base=page.getViewport({scale:1}),available=Math.max(360,Math.min(920,viewer.clientWidth-70)),scale=available/base.width;
       const viewport=page.getViewport({scale}),pixelRatio=Math.min(window.devicePixelRatio||1,2),renderViewport=page.getViewport({scale:scale*pixelRatio});
-      const shell=document.createElement("div"),canvas=document.createElement("canvas"),label=document.createElement("span");
+      const shell=document.createElement("div"),canvas=document.createElement("canvas"),textLayer=document.createElement("div"),label=document.createElement("span");
       shell.className="pdf-page-shell"; shell.dataset.page=pageNumber; shell.style.width=`${viewport.width}px`; shell.style.height=`${viewport.height}px`;
-      canvas.width=Math.floor(renderViewport.width); canvas.height=Math.floor(renderViewport.height); label.className="pdf-page-number"; label.textContent=pageNumber;
-      shell.append(canvas,label); pages.appendChild(shell);
+      shell.style.setProperty("--total-scale-factor",scale); shell.style.setProperty("--scale-round-x","1px"); shell.style.setProperty("--scale-round-y","1px");
+      canvas.width=Math.floor(renderViewport.width); canvas.height=Math.floor(renderViewport.height); textLayer.className="textLayer"; label.className="pdf-page-number"; label.textContent=pageNumber;
+      pdfjsLib.setLayerDimensions(textLayer,viewport);
+      shell.append(canvas,textLayer,label); pages.appendChild(shell);
       await page.render({canvasContext:canvas.getContext("2d"),viewport:renderViewport}).promise;
+      const textContent=await page.getTextContent();
+      await new pdfjsLib.TextLayer({textContentSource:textContent,container:textLayer,viewport}).render();
+      let pointerStart=null;
+      shell.addEventListener("pointerdown",event=>{pointerStart={x:event.clientX,y:event.clientY};});
       shell.addEventListener("click",event=>{
+        const moved=pointerStart&&Math.hypot(event.clientX-pointerStart.x,event.clientY-pointerStart.y)>4;
+        pointerStart=null;
+        const selection=window.getSelection();
+        if(moved||(selection&&!selection.isCollapsed&&shell.contains(selection.anchorNode)))return;
         const rect=shell.getBoundingClientRect(),pageWidth=base.width,pageHeight=base.height;
         locatePdfSource(pageNumber,(event.clientX-rect.left)/rect.width*pageWidth,(event.clientY-rect.top)/rect.height*pageHeight,shell);
       });
     }
-    viewer.scrollTop=Math.min(previousScroll,viewer.scrollHeight-viewer.clientHeight); setStatus("PDF 已载入，点击页面可定位源码","ok");
+    viewer.scrollTop=Math.min(previousScroll,viewer.scrollHeight-viewer.clientHeight); setStatus("PDF 已载入，可选择文字；单击可定位源码","ok");
   }catch(error){ if(token===pdfLoadToken){pages.innerHTML=`<div class="pdf-loading">PDF 载入失败：${escapeHtml(error.message)}</div>`;setStatus("PDF 载入失败","error");} }
 }
 async function locatePdfSource(page,x,y,shell){

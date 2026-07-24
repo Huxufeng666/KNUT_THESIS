@@ -82,9 +82,14 @@ kbd { margin-left:8px; padding:2px 5px; border-radius:4px; background:rgba(255,2
 .preview-panel { display:flex; flex-direction:column; position:relative; }
 .pdf-viewer { flex:1; min-height:0; overflow:auto; background:#252826; scroll-behavior:smooth; }
 .pdf-pages { min-height:100%; display:flex; flex-direction:column; align-items:center; gap:18px; padding:22px 28px 42px; }
-.pdf-page-shell { position:relative; flex:none; background:#fff; box-shadow:0 3px 16px rgba(0,0,0,.38); cursor:crosshair; }
+.pdf-page-shell { position:relative; flex:none; background:#fff; box-shadow:0 3px 16px rgba(0,0,0,.38); cursor:text; }
 .pdf-page-shell:hover { outline:2px solid rgba(83,158,121,.65); outline-offset:2px; }
 .pdf-page-shell canvas { display:block; width:100%; height:100%; }
+.textLayer { position:absolute; inset:0; overflow:clip; line-height:1; text-align:initial; text-size-adjust:none; forced-color-adjust:none; transform-origin:0 0; cursor:text; z-index:2; }
+.textLayer :is(span,br) { position:absolute; color:transparent; white-space:pre; transform-origin:0% 0%; cursor:text; }
+.textLayer span { font-size:calc(var(--font-height) * var(--total-scale-factor)); transform:rotate(var(--rotate,0deg)) scaleX(var(--scale-x,1)); }
+.textLayer br { user-select:none; }
+.textLayer ::selection { color:transparent; background:rgba(42,132,209,.38); }
 .pdf-page-number { position:absolute; left:50%; bottom:-18px; transform:translateX(-50%); color:#cbd0cd; font:10px/1 sans-serif; pointer-events:none; }
 .pdf-loading { margin:auto; padding:14px 18px; border-radius:9px; color:#dce5e0; background:#303532; font-size:12px; }
 .pdf-locate-hint { color:var(--muted); font-size:10px; font-weight:400; }
