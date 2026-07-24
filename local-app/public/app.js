@@ -54,7 +54,7 @@ function updateAccountView(){
 }
 async function initCloud(){
   try{
-    const {createClient}=await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm");
+    const {createClient}=await import("/vendor/supabase/supabase.mjs");
     supabase=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
     const {data}=await supabase.auth.getSession(); cloudUser=data.session?.user||null;cloudAccessToken=data.session?.access_token||"";updateAccountView();
     supabase.auth.onAuthStateChange((_event,session)=>{

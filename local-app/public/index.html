@@ -81,12 +81,13 @@
     <section class="account-card">
       <div class="account-head"><div><strong id="accountTitle">账号与云同步</strong><span>同一账号可在不同设备同步论文源文件</span></div><button id="closeAccountModal" class="icon-button" aria-label="关闭">×</button></div>
       <div id="signedOutView">
+        <p class="account-help">推荐使用邮箱登录，不依赖 Google 服务。</p>
         <label class="field-label" for="emailInput">邮箱地址</label>
         <input id="emailInput" class="account-input" type="email" autocomplete="email" placeholder="name@example.com" />
         <button id="emailLoginBtn" class="button primary wide">发送登录链接</button>
         <div class="or-divider"><span>或</span></div>
-        <button id="googleLoginBtn" class="button wide">使用 Google 登录</button>
-        <p class="account-help">邮箱登录无需密码。首次使用时请在邮件中点击登录链接。</p>
+        <button id="googleLoginBtn" class="button wide">使用 Google 登录（备用）</button>
+        <p class="account-help">邮箱登录无需密码，请在收到的邮件中点击登录链接。Google 登录在部分网络环境下可能不可用。</p>
       </div>
       <div id="signedInView" class="hidden">
         <div class="user-row"><div><small>当前账号</small><strong id="accountEmail"></strong></div><button id="signOutBtn" class="button ghost">退出登录</button></div>
