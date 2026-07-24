@@ -5,6 +5,8 @@ services:
       dockerfile: Dockerfile
     container_name: knut-thesis-studio
     restart: unless-stopped
+    entrypoint: ["node"]
+    command: ["local-app/production-server.mjs"]
     ports:
       - "127.0.0.1:4173:4173"
     environment:
