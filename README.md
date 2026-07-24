@@ -171,18 +171,45 @@ AI 生成内容可能存在事实、引用或格式错误，正式提交论文�
 
 ## 九、论文文件说明
 
+### 编辑器中显示的文件
+
+| 编辑器显示路径 | 文件用途 | 建议修改内容 |
+| --- | --- | --- |
+| `abstract/abstract-kr.tex` | 论文最后的韩文摘要页面。主文件在参考文献之后载入它。 | 修改韩文论文标题和韩文摘要正文。保留 LaTeX 命令、公式与引用格式。 |
+| `abstract/abstract.tex` | 论文前部的英文摘要页面，位于目录之前。 | 修改英文论文标题和英文摘要正文。 |
+| `chapters/CH1.tex` | 第一章 **Introduction** 的正文。章节标题由 `manuscript.tex` 统一生成。 | 编写研究背景、问题定义、研究动机和主要贡献；不要在文件开头重复添加 `\chapter`。 |
+| `chapters/CH2.tex` | 第二章 **Related Work** 的正文。 | 编写相关研究、理论基础和已有方法比较；文献使用 `\cite{文献键}` 引用。 |
+| `chapters/CH3.tex` | 第三章 **Proposed Methodology** 的正文。 | 编写提出的方法、模型结构、算法、公式和实现细节。 |
+| `chapters/CH4.tex` | 第四章 **Experiments Evaluation and Analysis** 的正文。 | 编写数据集、实验设置、评价指标、结果表格、对比实验和结果分析。 |
+| `chapters/CH5.tex` | 第五章 **Conclusion and Future Work** 的正文。 | 编写研究结论、局限性和未来工作。 |
+| `frontmatters/frontmatter.tex` | 独立前置页文档入口，使用不同纸张尺寸组合 `title.tex` 和 `title2.tex`。 | 只有需要单独重新生成 `frontmatter.pdf` 时才编译此文件；当前主论文主要直接使用 `titlePages/` 中的页面。 |
+| `frontmatters/title.tex` | 独立前置文档的正面封面。 | 修改论文中英文标题、姓名、学位类型、学校、专业、导师和日期。 |
+| `frontmatters/title2.tex` | 独立前置文档的书脊/侧边标题页。 | 修改书脊显示的英文标题、作者姓名和日期；旋转排版代码一般不需要改动。 |
+| `manuscript.tex` | 整篇论文的主入口。真实路径是 `KNUT-Thesis-Files/manuscript.tex`，编辑器为简洁起见只显示文件名。 | 配置宏包、页面尺寸、目录、章节标题、章节顺序、参考文献和摘要载入顺序。普通正文应写在对应章节文件中。 |
+| `references.bib` | BibLaTeX/Biber 参考文献数据库。真实路径是 `KNUT-Thesis-Files/references.bib`。 | 每篇文献添加一个 BibTeX 条目，并确保条目键与正文中的 `\cite{...}` 一致。 |
+| `titlePages/page1_title3.tex` | 主论文载入的第一个标题页，显示学位类型、论文标题、导师、日期、学校、专业和作者。 | 修改页面顶部的基本信息宏；正文主要由第 31 行之后的排版代码生成。 |
+| `titlePages/page2_title4.tex` | 主论文载入的第二个标题页，包含论文提交声明。 | 修改标题、提交声明、导师、日期、学校、专业和作者信息。 |
+| `titlePages/page3_title5.tex` | 主论文载入的第三个标题页，用于作者提交/学位论文声明信息。 | 修改作者姓名、学位类型、提交日期，以及学校要求的声明文字。 |
+
+### 其他重要目录和文件
+
 | 路径 | 用途 |
 | --- | --- |
-| `manuscript.tex` | 论文主入口和全局宏包配置 |
-| `frontmatters/` | 前置页面及封面相关内容 |
-| `titlePages/` | 标题页 |
-| `abstract/` | 英文和韩文摘要 |
-| `chapters/` | 各论文章节 |
-| `figures/` | 图片和图表资源 |
-| `references.bib` | BibLaTeX/Biber 参考文献数据库 |
-| `local-app/` | 本地网页编辑器程序 |
+| `figures/` | 保存论文使用的图片、流程图和实验结果图。建议使用有意义的英文文件名，并通过 `\includegraphics` 引用。 |
+| `local-app/` | 本地网页编辑器程序。普通论文写作时不要修改其中的代码。 |
+| `KNUT-Thesis-Files/manuscript.pdf` | 最近一次成功编译生成的论文 PDF。编译失败时，右侧可能继续显示这个旧版本。 |
+| `setup-knut-editor.vbs` | 最外层的一键安装和启动入口，新用户与日常启动都双击此文件。 |
 
-通常应先修改标题、作者、学校、专业和日期信息，再编辑摘要、章节与参考文献，最后编译 `manuscript.tex`。
+### 推荐修改顺序
+
+1. 修改 `titlePages/page1_title3.tex`、`page2_title4.tex` 和 `page3_title5.tex` 中的个人与论文信息。
+2. 修改英文摘要 `abstract/abstract.tex` 和韩文摘要 `abstract/abstract-kr.tex`。
+3. 按顺序编写 `chapters/CH1.tex` 至 `chapters/CH5.tex`。
+4. 将图片放入 `figures/`，将文献条目写入 `references.bib`。
+5. 只有需要调整全局格式、章节标题或文件顺序时，才修改 `manuscript.tex`。
+6. 按 `Ctrl + S` 保存并编译，检查右侧 PDF。
+
+注意：多个标题页文件分别保存了一份标题、作者和日期宏。修改个人信息时应检查所有标题页，避免不同页面显示不一致。
 
 ## 十、常见问题
 
