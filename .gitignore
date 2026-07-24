@@ -1,0 +1,33 @@
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Node dependencies and caches
+node_modules/
+.npm/
+.pnpm-store/
+
+# LaTeX temporary build files
+*.aux
+*.bcf
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.lot
+*.log
+*.out
+*.run.xml
+*.synctex
+*.synctex.gz
+*.toc
+*.xdv
+
+# Editor and operating-system files
+*.bak
+*.tmp
+.DS_Store
+Thumbs.db
+desktop.ini

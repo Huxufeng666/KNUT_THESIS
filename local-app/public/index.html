@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KNUT Thesis Studio</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="mark">K</span><div><strong>KNUT Thesis Studio</strong><small>本地论文工作台</small></div></div>
+    <div class="document-status"><span id="saveDot" class="dot"></span><span id="status">正在连接本地项目…</span></div>
+    <div class="top-actions"><button id="colorSettingsBtn" class="button ghost">◐ 编辑器配色</button><button id="compileBtn" class="button ghost">编译 PDF</button><button id="saveBtn" class="button primary">保存并编译 <kbd>Ctrl S</kbd></button></div>
+  </header>
+
+  <section id="colorPanel" class="color-panel hidden" aria-label="编辑器配色设置">
+    <div class="color-panel-head"><div><strong>编辑器配色</strong><span>选择预设或单独调整颜色</span></div><button id="closeColorPanel" class="icon-button" aria-label="关闭配色设置">×</button></div>
+    <div class="preset-row"><button data-preset="paper">明亮</button><button data-preset="eye">护眼</button><button data-preset="dark">深色</button></div>
+    <div class="color-grid">
+      <label><span>普通文字</span><input type="color" data-color="text"></label>
+      <label><span>编辑背景</span><input type="color" data-color="background"></label>
+      <label><span>LaTeX 命令</span><input type="color" data-color="command"></label>
+      <label><span>注释</span><input type="color" data-color="comment"></label>
+      <label><span>花括号</span><input type="color" data-color="brace"></label>
+      <label><span>可选参数</span><input type="color" data-color="optional"></label>
+      <label><span>数学符号</span><input type="color" data-color="math"></label>
+      <label><span>数字</span><input type="color" data-color="number"></label>
+      <label><span>当前行</span><input type="color" data-color="activeLine"></label>
+    </div>
+    <div class="color-panel-foot"><button id="resetColors" class="button ghost">恢复默认</button><span>设置自动保存在本机</span></div>
+  </section>
+
+  <main class="workspace">
+    <aside class="sidebar panel">
+      <div class="panel-title"><span>论文结构</span><button id="refreshBtn" class="icon-button" title="刷新文件">↻</button></div>
+      <div id="projectPath" class="project-path"></div>
+      <nav id="fileTree" class="file-tree"></nav>
+      <div class="sidebar-note"><strong>本机文件</strong><span>这里的保存会直接写入你的 LaTeX 项目。</span></div>
+    </aside>
+
+    <section class="editor-panel panel">
+      <div class="editor-head">
+        <div><span id="activeFile" class="file-name">选择一个文件</span><span id="dirtyBadge" class="dirty-badge hidden">未保存</span></div>
+        <div class="selection-meta"><span id="selectionCount">0 字</span><button id="wrapBtn" class="mini-tool active" title="切换长行自动换行">↵ 自动换行</button><button id="commentBtn" class="mini-tool" title="切换 LaTeX 行注释">% 注释 <kbd>Ctrl /</kbd></button></div>
+      </div>
+      <div class="code-editor">
+        <div id="lineNumbers" aria-hidden="true"></div>
+        <div id="activeLine" aria-hidden="true"></div>
+        <pre id="highlightLayer" aria-hidden="true"></pre>
+        <textarea id="editor" spellcheck="false" wrap="soft" aria-label="LaTeX 编辑器" placeholder="请从左侧选择一个文件…"></textarea>
+      </div>
+      <div class="ai-bar">
+        <div class="ai-label"><span class="spark">✦</span><div><strong>AI 学术助手</strong><small>先选中文字，再选择操作</small></div></div>
+        <div class="ai-controls">
+          <div class="ai-actions">
+            <button data-action="polish">学术润色</button><button data-action="expand">扩写</button><button data-action="shorten">精简</button><button data-action="translate_en">译为英文</button><button data-action="translate_zh">译为中文</button>
+          </div>
+          <div class="ai-custom-row">
+            <input id="aiPrompt" type="text" autocomplete="off" placeholder="直接告诉 AI 如何修改选中文字，例如：加强论证逻辑并保持 LaTeX 引用" aria-label="自定义 AI 修改要求" />
+            <button id="sendAiPrompt" class="ai-send">发送 <kbd>Ctrl ↵</kbd></button>
+          </div>
+        </div>
+      </div>
+      <div id="aiReview" class="ai-review hidden">
+        <div class="review-head"><strong>AI 修改建议</strong><span>请检查后再替换</span></div>
+        <textarea id="aiResult" aria-label="AI 修改结果"></textarea>
+        <div class="review-actions"><button id="cancelAi" class="button ghost">取消</button><button id="applyAi" class="button primary">替换选中文字</button></div>
+      </div>
+    </section>
+
+    <section class="preview-panel panel">
+      <div class="panel-title"><span>PDF 预览</span><div class="preview-actions"><button id="reloadPdf" class="icon-button" title="刷新预览">↻</button></div></div>
+      <div id="pdfViewer" class="pdf-viewer" aria-label="论文 PDF 预览"><div id="pdfPages" class="pdf-pages"><div class="pdf-loading">正在载入 PDF…</div></div></div>
+      <div id="compileLog" class="compile-log hidden"><div class="log-head"><strong>编译信息</strong><button id="closeLog" class="icon-button">×</button></div><pre id="logText"></pre></div>
+    </section>
+  </main>
+  <div id="fileContextMenu" class="context-menu hidden" role="menu"><button id="renameFileBtn" role="menuitem"><span>✎</span>重命名文件</button></div>
+  <div id="toast" class="toast"></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
