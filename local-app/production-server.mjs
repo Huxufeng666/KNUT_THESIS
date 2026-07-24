@@ -108,6 +108,23 @@ async function listFiles(root, dir = root, base = "") {
   return output;
 }
 
+async function listTemplateFiles() {
+  const files = [];
+  for (const entry of templateEntries) {
+    const source = path.join(templateRoot, entry);
+    if (fsSync.existsSync(source)) files.push(...await listFiles(templateRoot, source, entry));
+  }
+  return files;
+}
+
+function safeTemplatePath(relativePath) {
+  const full = safeProjectPath(templateRoot, relativePath);
+  const relative = path.relative(templateRoot, full).replaceAll(path.sep, "/");
+  if (!templateEntries.some(entry => relative === entry || relative.startsWith(`${entry}/`))) throw new Error("模板文件路径无效");
+  if (!allowedExtensions.has(path.extname(full).toLowerCase())) throw new Error("不支持读取这种模板文件");
+  return full;
+}
+
 function findCommand(command) {
   const extensions = process.platform === "win32" ? [".exe", ".cmd", ".bat", ""] : [""];
   for (const folder of String(process.env.PATH || "").split(path.delimiter)) {
@@ -310,12 +327,30 @@ async function handleApi(req, res, url, root, user) {
   return json(res, 404, { error: "Not found" });
 }
 
+async function handleDemoApi(req, res, url) {
+  if (req.method === "GET" && url.pathname === "/api/demo/files") {
+    return json(res, 200, { files: await listTemplateFiles(), projectRoot: "KNUT 官方模板 · 游客只读" });
+  }
+  if (req.method === "GET" && url.pathname === "/api/demo/file") {
+    const file = url.searchParams.get("path");
+    return json(res, 200, { path: file, content: await fs.readFile(safeTemplatePath(file), "utf8"), readOnly: true });
+  }
+  if (req.method === "GET" && url.pathname === "/api/demo/pdf") {
+    const pdf = path.join(templateRoot, mainPdfRelative);
+    const stat = await fs.stat(pdf);
+    res.writeHead(200, { "Content-Type": "application/pdf", "Content-Length": stat.size, "Cache-Control": "public, max-age=300", "X-Content-Type-Options": "nosniff" });
+    return fsSync.createReadStream(pdf).pipe(res);
+  }
+  return json(res, 404, { error: "Not found" });
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${host}:${port}`);
     if (req.method === "GET" && url.pathname === "/api/config") {
       return json(res, 200, { mode: "production", supabaseUrl });
     }
+    if (url.pathname.startsWith("/api/demo/")) return await handleDemoApi(req, res, url);
     if (url.pathname.startsWith("/api/")) {
       const user = await authenticate(req);
       const root = await ensureWorkspace(user.id);

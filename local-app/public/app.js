@@ -22,6 +22,7 @@ let cloudUser = null;
 let cloudAccessToken = "";
 let cloudSyncInFlight = false;
 let productionMode = false;
+let demoMode = false;
 let softWrap = localStorage.getItem("knut-soft-wrap") !== "false";
 let contextFile = "";
 let pdfLoadToken = 0;
@@ -53,9 +54,15 @@ function updateAccountView(){
   $("signedInView").classList.toggle("hidden",!cloudUser);
   $("accountBtn").textContent=cloudUser?`☁ ${cloudUser.email||"已登录"}`:"☁ 登录 / 同步";
   if(cloudUser)$("accountEmail").textContent=cloudUser.email||cloudUser.id;
-  const showWelcome=productionMode&&!cloudUser;
-  $("welcomeState").classList.toggle("hidden",!showWelcome);
-  if(showWelcome)editor.disabled=true;
+  demoMode=productionMode&&!cloudUser;
+  $("welcomeState").classList.add("hidden");
+  editor.readOnly=demoMode;
+  $("saveBtn").disabled=demoMode;
+  $("compileBtn").disabled=demoMode;
+  $("commentBtn").disabled=demoMode;
+  document.querySelectorAll(".ai-actions button").forEach(button=>button.disabled=demoMode);
+  $("aiPrompt").disabled=demoMode;
+  $("sendAiPrompt").disabled=demoMode;
 }
 async function initCloud(){
   try{
@@ -79,7 +86,9 @@ async function initCloud(){
       cloudUser=session?.user||null;cloudAccessToken=session?.access_token||"";updateAccountView();
       if(cloudUser){
         setCloudStatus("已登录，可同步","ok");
-        if(!wasSignedIn){loadFiles();reloadPdf();}
+        if(!wasSignedIn){activeFile="";original="";loadFiles();reloadPdf();}
+      }else if(wasSignedIn){
+        activeFile="";original="";editor.value="";syncHighlight();loadFiles();reloadPdf();
       }
     });
   }catch(error){
@@ -99,7 +108,7 @@ async function googleLogin(){
   const {error}=await supabase.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin}});
   if(error)toast(error.message);
 }
-async function signOut(){ if(!supabase)return; await supabase.auth.signOut(); cloudUser=null;cloudAccessToken="";updateAccountView();setCloudStatus("已退出登录");activeFile="";original="";editor.value="";syncHighlight(); }
+async function signOut(){ if(!supabase)return; await supabase.auth.signOut(); cloudUser=null;cloudAccessToken="";activeFile="";original="";editor.value="";updateAccountView();setCloudStatus("游客只读模板");syncHighlight();loadFiles();reloadPdf(); }
 async function cloudUpsertFiles(files,{quiet=false}={}){
   if(!supabase||!cloudUser||!files.length)return false;
   const rows=files.map(file=>({user_id:cloudUser.id,project_id:CLOUD_PROJECT,path:file.path,content:file.content,device_id:localDeviceId()}));
@@ -241,9 +250,9 @@ function displayFileName(file) {
   return file.startsWith("KNUT-Thesis-Files/") ? file.slice("KNUT-Thesis-Files/".length) : file;
 }
 async function loadFiles() {
-  try { const data=await api("/api/files"); $("projectPath").textContent=data.projectRoot; $("projectPath").title=data.projectRoot; const tree=$("fileTree"); tree.innerHTML="";
-    data.files.forEach(file=>{ const button=document.createElement("button"); button.className=`file-item${file===activeFile?" active":""}`; button.dataset.file=file; button.title=file; button.innerHTML=`<span class="icon">${fileIcon(file)}</span><span>${displayFileName(file)}</span>`; button.onclick=()=>openFile(file); button.oncontextmenu=event=>showFileContextMenu(event,file); tree.appendChild(button); });
-    setStatus("已连接本地项目","ok"); if(!activeFile&&data.files.includes("KNUT-Thesis-Files/manuscript.tex")) openFile("KNUT-Thesis-Files/manuscript.tex");
+  try { const data=await api(demoMode?"/api/demo/files":"/api/files"); $("projectPath").textContent=data.projectRoot; $("projectPath").title=data.projectRoot; const tree=$("fileTree"); tree.innerHTML="";
+    data.files.forEach(file=>{ const button=document.createElement("button"); button.className=`file-item${file===activeFile?" active":""}`; button.dataset.file=file; button.title=file; button.innerHTML=`<span class="icon">${fileIcon(file)}</span><span>${displayFileName(file)}</span>`; button.onclick=()=>openFile(file); if(!demoMode)button.oncontextmenu=event=>showFileContextMenu(event,file); tree.appendChild(button); });
+    setStatus(demoMode?"游客只读模板 · 登录后可编辑":"已连接个人项目",demoMode?"warn":"ok"); if(!activeFile&&data.files.includes("KNUT-Thesis-Files/manuscript.tex")) openFile("KNUT-Thesis-Files/manuscript.tex");
   } catch(error){ setStatus(error.message,"error"); }
 }
 function showFileContextMenu(event,file){
@@ -268,10 +277,11 @@ async function renameContextFile(){
 }
 async function openFile(file) {
   if(setDirty()&&!(await autoSave({silent:true})))return;
-  try { setStatus("正在读取…"); const data=await api(`/api/file?path=${encodeURIComponent(file)}`); activeFile=file; original=data.content; editor.value=data.content; syncHighlight(); editor.disabled=false; $("activeFile").textContent=displayFileName(file); document.querySelectorAll(".file-item").forEach(el=>el.classList.toggle("active",el.dataset.file===file)); updateSelection(); setStatus("文件已载入","ok"); }
+  try { setStatus("正在读取…"); const data=await api(`${demoMode?"/api/demo/file":"/api/file"}?path=${encodeURIComponent(file)}`); activeFile=file; original=data.content; editor.value=data.content; syncHighlight(); editor.disabled=false;editor.readOnly=demoMode; $("activeFile").textContent=`${displayFileName(file)}${demoMode?" · 只读":""}`; document.querySelectorAll(".file-item").forEach(el=>el.classList.toggle("active",el.dataset.file===file)); updateSelection(); setStatus(demoMode?"游客只读模板 · 登录后可编辑":"文件已载入",demoMode?"warn":"ok"); }
   catch(error){ toast(error.message); setStatus("读取失败","error"); }
 }
 async function autoSave({silent=false}={}){
+  if(demoMode)return true;
   if(!activeFile||editor.value===original)return true;
   if(autoSaveInFlight)return autoSaveInFlight;
   const fileAtStart=activeFile,contentAtStart=editor.value;
@@ -296,6 +306,7 @@ function emergencySave(){
   return true;
 }
 async function saveFile() {
+  if(demoMode)return toast("游客模式只能查看模板，请登录后编辑");
   if(!activeFile) return toast("请先选择文件");
   try { setStatus("正在保存并编译…","warn"); const data=await api("/api/file",{method:"PUT",body:JSON.stringify({path:activeFile,content:editor.value,compile:true})}); original=editor.value; setDirty(); await cloudSaveCurrent(activeFile,editor.value); handleCompile(data.compile); toast(cloudUser?"已保存到本地并同步云端":"已保存到本地文件"); }
   catch(error){ setStatus("保存失败","error"); toast(error.message); }
@@ -306,7 +317,7 @@ async function reloadPdf(){
   const token=++pdfLoadToken,pages=$("pdfPages"),viewer=$("pdfViewer"),previousScroll=viewer.scrollTop;
   pages.innerHTML='<div class="pdf-loading">正在载入 PDF…</div>';
   try{
-    const documentTask=pdfjsLib.getDocument({url:`/api/pdf?t=${Date.now()}`,httpHeaders:cloudAccessToken?{Authorization:`Bearer ${cloudAccessToken}`}:{}}); const pdf=await documentTask.promise;
+    const documentTask=pdfjsLib.getDocument({url:`${demoMode?"/api/demo/pdf":"/api/pdf"}?t=${Date.now()}`,httpHeaders:cloudAccessToken?{Authorization:`Bearer ${cloudAccessToken}`}:{}}); const pdf=await documentTask.promise;
     if(token!==pdfLoadToken)return; pages.innerHTML="";
     for(let pageNumber=1;pageNumber<=pdf.numPages;pageNumber++){
       const page=await pdf.getPage(pageNumber); if(token!==pdfLoadToken)return;
@@ -388,6 +399,7 @@ function jumpToSourceLine(line){
 }
 function updateSelection(){ const count=Math.max(0,editor.selectionEnd-editor.selectionStart); $("selectionCount").textContent=`${count} 字`; }
 function toggleComment(){
+  if(demoMode)return toast("游客模式只能查看模板，请登录后编辑");
   if(!activeFile)return toast("请先选择文件");
   const value=editor.value,start=editor.selectionStart,end=editor.selectionEnd;
   const effectiveEnd=end>start&&value[end-1]==="\n"?end-1:end;
@@ -416,6 +428,7 @@ function applySoftWrap(){
   localStorage.setItem("knut-soft-wrap",String(softWrap)); syncHighlight();
 }
 async function runAi(action,instruction=""){
+  if(demoMode)return toast("游客模式只能查看模板，请登录后使用 AI");
   if(!activeFile) return toast("请先选择文件"); const start=editor.selectionStart,end=editor.selectionEnd,text=editor.value.slice(start,end); if(!text.trim()) return toast("请先在正文中选择需要处理的文字");
   aiSelection={start,end}; try{ setStatus("AI 正在处理选中文字…","warn"); document.querySelectorAll(".ai-actions button").forEach(b=>b.disabled=true); $("sendAiPrompt").disabled=true; $("aiPrompt").disabled=true; const data=await api("/api/ai",{method:"POST",body:JSON.stringify({action,text,file:activeFile,instruction})}); $("aiResult").value=data.text; $("aiReview").classList.remove("hidden"); setStatus("AI 建议已生成，请检查","ok"); }
   catch(error){ toast(error.message); setStatus("AI 请求未完成","error"); }
@@ -458,7 +471,6 @@ async function boot(){
     if(response.ok)productionMode=(await response.json()).mode==="production";
   }catch{}
   await initCloud();
-  if(!productionMode||cloudUser){$("welcomeState").classList.add("hidden");reloadPdf();loadFiles();}
-  else{setStatus("请登录后打开论文项目","warn");$("pdfPages").innerHTML='<div class="pdf-loading">请先登录以载入个人论文 PDF</div>';}
+  $("welcomeState").classList.add("hidden");reloadPdf();loadFiles();
 }
 boot();
