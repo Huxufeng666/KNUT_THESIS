@@ -182,22 +182,50 @@ async function reloadPdf(){
       const page=await pdf.getPage(pageNumber); if(token!==pdfLoadToken)return;
       const base=page.getViewport({scale:1}),available=Math.max(360,Math.min(920,viewer.clientWidth-70)),scale=available/base.width;
       const viewport=page.getViewport({scale}),pixelRatio=Math.min(window.devicePixelRatio||1,2),renderViewport=page.getViewport({scale:scale*pixelRatio});
-      const shell=document.createElement("div"),canvas=document.createElement("canvas"),textLayer=document.createElement("div"),label=document.createElement("span");
+      const shell=document.createElement("div"),canvas=document.createElement("canvas"),textLayer=document.createElement("div"),locateSelection=document.createElement("button"),label=document.createElement("span");
       shell.className="pdf-page-shell"; shell.dataset.page=pageNumber; shell.style.width=`${viewport.width}px`; shell.style.height=`${viewport.height}px`;
       shell.style.setProperty("--total-scale-factor",scale); shell.style.setProperty("--scale-round-x","1px"); shell.style.setProperty("--scale-round-y","1px");
-      canvas.width=Math.floor(renderViewport.width); canvas.height=Math.floor(renderViewport.height); textLayer.className="textLayer"; label.className="pdf-page-number"; label.textContent=pageNumber;
+      canvas.width=Math.floor(renderViewport.width); canvas.height=Math.floor(renderViewport.height); textLayer.className="textLayer";
+      locateSelection.className="pdf-selection-locate hidden"; locateSelection.type="button"; locateSelection.textContent="↗ 定位源码";
+      label.className="pdf-page-number"; label.textContent=pageNumber;
       pdfjsLib.setLayerDimensions(textLayer,viewport);
-      shell.append(canvas,textLayer,label); pages.appendChild(shell);
+      shell.append(canvas,textLayer,locateSelection,label); pages.appendChild(shell);
       await page.render({canvasContext:canvas.getContext("2d"),viewport:renderViewport}).promise;
       const textContent=await page.getTextContent();
       await new pdfjsLib.TextLayer({textContentSource:textContent,container:textLayer,viewport}).render();
-      let pointerStart=null;
-      shell.addEventListener("pointerdown",event=>{pointerStart={x:event.clientX,y:event.clientY};});
+      let pointerStart=null,selectionPoint=null;
+      locateSelection.addEventListener("pointerdown",event=>event.stopPropagation());
+      locateSelection.addEventListener("click",event=>{
+        event.stopPropagation(); if(!selectionPoint)return;
+        locatePdfSource(pageNumber,selectionPoint.x,selectionPoint.y,shell); locateSelection.classList.add("hidden");
+      });
+      shell.addEventListener("pointerdown",event=>{
+        if(event.target.closest(".pdf-selection-locate"))return;
+        document.querySelectorAll(".pdf-selection-locate").forEach(button=>button.classList.add("hidden"));
+        pointerStart={x:event.clientX,y:event.clientY};
+      });
+      shell.addEventListener("pointerup",event=>{
+        if(!pointerStart||Math.hypot(event.clientX-pointerStart.x,event.clientY-pointerStart.y)<=4)return;
+        setTimeout(()=>{
+          const selection=window.getSelection(); if(!selection||selection.isCollapsed||!selection.rangeCount)return;
+          if(!shell.contains(selection.anchorNode)&&!shell.contains(selection.focusNode))return;
+          const shellRect=shell.getBoundingClientRect();
+          const rects=[...selection.getRangeAt(0).getClientRects()].filter(rect=>rect.width>0&&rect.height>0&&rect.bottom>=shellRect.top&&rect.top<=shellRect.bottom);
+          const rect=rects.at(-1); if(!rect)return;
+          const centerX=Math.max(shellRect.left,Math.min(shellRect.right,(rect.left+rect.right)/2));
+          const centerY=Math.max(shellRect.top,Math.min(shellRect.bottom,(rect.top+rect.bottom)/2));
+          selectionPoint={x:(centerX-shellRect.left)/shellRect.width*base.width,y:(centerY-shellRect.top)/shellRect.height*base.height};
+          locateSelection.style.left=`${Math.max(58,Math.min(shellRect.width-58,centerX-shellRect.left))}px`;
+          locateSelection.style.top=`${Math.max(18,Math.min(shellRect.height-18,centerY-shellRect.top-28))}px`;
+          locateSelection.classList.remove("hidden"); setStatus("已选择 PDF 文字，点击“定位源码”跳转","ok");
+        },0);
+      });
       shell.addEventListener("click",event=>{
         const moved=pointerStart&&Math.hypot(event.clientX-pointerStart.x,event.clientY-pointerStart.y)>4;
         pointerStart=null;
         const selection=window.getSelection();
-        if(moved||(selection&&!selection.isCollapsed&&shell.contains(selection.anchorNode)))return;
+        if(moved||(selection&&!selection.isCollapsed&&(shell.contains(selection.anchorNode)||shell.contains(selection.focusNode))))return;
+        locateSelection.classList.add("hidden");
         const rect=shell.getBoundingClientRect(),pageWidth=base.width,pageHeight=base.height;
         locatePdfSource(pageNumber,(event.clientX-rect.left)/rect.width*pageWidth,(event.clientY-rect.top)/rect.height*pageHeight,shell);
       });

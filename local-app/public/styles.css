@@ -94,6 +94,8 @@ body.resizing-panes,body.resizing-panes * { cursor:col-resize!important; user-se
 .textLayer span { font-size:calc(var(--font-height) * var(--total-scale-factor)); transform:rotate(var(--rotate,0deg)) scaleX(var(--scale-x,1)); }
 .textLayer br { user-select:none; }
 .textLayer ::selection { color:transparent; background:rgba(42,132,209,.38); }
+.pdf-selection-locate { position:absolute; z-index:6; transform:translate(-50%,-100%); border:1px solid #1e5b45; border-radius:7px; padding:6px 9px; color:#fff; background:#1e5b45; box-shadow:0 5px 18px rgba(0,0,0,.24); cursor:pointer; font-size:11px; white-space:nowrap; }
+.pdf-selection-locate:hover { background:#2d765a; }
 .pdf-page-number { position:absolute; left:50%; bottom:-18px; transform:translateX(-50%); color:#cbd0cd; font:10px/1 sans-serif; pointer-events:none; }
 .pdf-loading { margin:auto; padding:14px 18px; border-radius:9px; color:#dce5e0; background:#303532; font-size:12px; }
 .pdf-locate-hint { color:var(--muted); font-size:10px; font-weight:400; }
