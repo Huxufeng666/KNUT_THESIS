@@ -54,18 +54,45 @@ async function authenticate(req) {
   if (!response.ok) throw new Error("登录已失效，请重新登录");
   const user = await response.json();
   if (!/^[0-9a-f-]{36}$/i.test(user.id || "")) throw new Error("无效的用户身份");
-  return user;
+  return { ...user, authorization };
 }
 
-function userRoot(userId) {
-  return path.join(dataRoot, "users", userId);
+async function supabaseRpc(user, name, body = {}) {
+  const response = await fetch(`${supabaseUrl}/rest/v1/rpc/${name}`, {
+    method: "POST",
+    headers: { apikey: publishableKey, Authorization: user.authorization, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = response.status === 204 ? null : await response.json();
+  if (!response.ok) throw new Error(data?.message || data?.error || `Supabase RPC failed: ${name}`);
+  return data;
 }
 
-async function ensureWorkspace(userId) {
-  if (workspacePromises.has(userId)) return workspacePromises.get(userId);
+async function getProjects(user) {
+  return await supabaseRpc(user, "list_my_thesis_projects");
+}
+
+async function getProjectAccess(user, requestedId) {
+  const projects = await getProjects(user);
+  const projectId = requestedId || projects?.[0]?.project_id;
+  const access = projects?.find(project => project.project_id === projectId);
+  if (!access) throw new Error("你无权访问这个论文项目");
+  return access;
+}
+
+function projectRoot(projectId) {
+  return path.join(dataRoot, "projects", projectId);
+}
+
+async function ensureWorkspace(projectId, ownerUserId, isOwner) {
+  if (workspacePromises.has(projectId)) return workspacePromises.get(projectId);
   const promise = (async () => {
-    const root = userRoot(userId);
+    const root = projectRoot(projectId);
     await fs.mkdir(root, { recursive: true, mode: 0o700 });
+    const legacyRoot = path.join(dataRoot, "users", ownerUserId);
+    if (isOwner && !fsSync.existsSync(path.join(root, ".initialized")) && fsSync.existsSync(path.join(legacyRoot, ".initialized"))) {
+      await fs.cp(legacyRoot, root, { recursive: true, force: false, errorOnExist: false });
+    }
     const marker = path.join(root, ".initialized");
     const mainTex = path.join(root, mainTexRelative);
     if (!fsSync.existsSync(marker) || !fsSync.existsSync(mainTex)) {
@@ -83,7 +110,7 @@ async function ensureWorkspace(userId) {
     }
     return root;
   })().finally(() => workspacePromises.delete(userId));
-  workspacePromises.set(userId, promise);
+  workspacePromises.set(projectId, promise);
   return promise;
 }
 
@@ -252,8 +279,16 @@ async function serveStatic(urlPath, res) {
   }
 }
 
-async function handleApi(req, res, url, root, user) {
-  if (req.method === "GET" && url.pathname === "/api/files") return json(res, 200, { files: await listFiles(root), projectRoot: `用户空间/${user.id.slice(0, 8)}` });
+async function handleApi(req, res, url, root, user, access) {
+  const writeRequest =
+    (req.method === "PUT" && url.pathname === "/api/file") ||
+    (req.method === "POST" && ["/api/autosave","/api/sync/import","/api/rename","/api/compile","/api/ai"].includes(url.pathname));
+  if (writeRequest && access.member_role === "viewer") throw new Error("只读成员没有修改权限");
+  if (req.method === "GET" && url.pathname === "/api/files") return json(res, 200, {
+    files: await listFiles(root),
+    projectRoot: `${access.project_name} · ${access.member_role}`,
+    project: access,
+  });
   if (req.method === "GET" && url.pathname === "/api/file") {
     const file = url.searchParams.get("path");
     return json(res, 200, { path: file, content: await fs.readFile(safeProjectPath(root, file), "utf8") });
@@ -327,6 +362,43 @@ async function handleApi(req, res, url, root, user) {
   return json(res, 404, { error: "Not found" });
 }
 
+async function handleCollaborationApi(req, res, url, user) {
+  if (req.method === "GET" && url.pathname === "/api/projects") {
+    return json(res, 200, { projects: await getProjects(user) });
+  }
+  const body = req.method === "GET" ? {} : await readJson(req);
+  const projectId = String(req.headers["x-knut-project"] || url.searchParams.get("projectId") || body.projectId || "");
+  const access = await getProjectAccess(user, projectId);
+  if (access.member_role !== "owner") throw new Error("只有论文所有者可以管理共享成员");
+  if (req.method === "GET" && url.pathname === "/api/project-members") {
+    return json(res, 200, { members: await supabaseRpc(user, "list_thesis_project_members", { target_project: access.project_id }) });
+  }
+  if (req.method === "POST" && url.pathname === "/api/project-members") {
+    await supabaseRpc(user, "invite_thesis_project_member", {
+      target_project: access.project_id,
+      target_email: body.email,
+      target_role: body.role,
+    });
+    return json(res, 200, { ok: true });
+  }
+  if (req.method === "PATCH" && url.pathname === "/api/project-members") {
+    await supabaseRpc(user, "update_thesis_project_member", {
+      target_project: access.project_id,
+      target_member: body.memberId,
+      target_role: body.role,
+    });
+    return json(res, 200, { ok: true });
+  }
+  if (req.method === "DELETE" && url.pathname === "/api/project-members") {
+    await supabaseRpc(user, "remove_thesis_project_member", {
+      target_project: access.project_id,
+      target_member: body.memberId,
+    });
+    return json(res, 200, { ok: true });
+  }
+  return json(res, 404, { error: "Not found" });
+}
+
 async function handleDemoApi(req, res, url) {
   if (req.method === "GET" && url.pathname === "/api/demo/files") {
     return json(res, 200, { files: await listTemplateFiles(), projectRoot: "KNUT 官方模板 · 游客只读" });
@@ -353,20 +425,25 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname.startsWith("/api/demo/")) return await handleDemoApi(req, res, url);
     if (url.pathname.startsWith("/api/")) {
       const user = await authenticate(req);
-      const root = await ensureWorkspace(user.id);
-      return await handleApi(req, res, url, root, user);
+      if (url.pathname === "/api/projects" || url.pathname === "/api/project-members") {
+        return await handleCollaborationApi(req, res, url, user);
+      }
+      const access = await getProjectAccess(user, String(req.headers["x-knut-project"] || ""));
+      const root = await ensureWorkspace(access.project_id, access.owner_id, access.owner_id === user.id);
+      return await handleApi(req, res, url, root, user, access);
     }
     if (await serveStatic(url.pathname, res)) return;
     return json(res, 404, { error: "Not found" });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const status = /登录|身份/.test(message) ? 401 : 400;
+    const status = /登录|身份/.test(message) ? 401 : /无权|权限|所有者/.test(message) ? 403 : 400;
     return json(res, status, { error: message });
   }
 });
 
 server.listen(port, host, async () => {
   await fs.mkdir(path.join(dataRoot, "users"), { recursive: true, mode: 0o700 });
+  await fs.mkdir(path.join(dataRoot, "projects"), { recursive: true, mode: 0o700 });
   console.log(`KNUT Thesis Studio production server: http://${host}:${port}`);
   console.log(`User data root: ${dataRoot}`);
 });

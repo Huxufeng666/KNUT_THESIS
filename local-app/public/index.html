@@ -103,8 +103,22 @@
       </div>
       <div id="signedInView" class="hidden">
         <div class="user-row"><div><small>当前账号</small><strong id="accountEmail"></strong></div><button id="signOutBtn" class="button ghost">退出登录</button></div>
+        <div id="projectRow" class="project-row">
+          <label for="projectSelect">当前论文项目</label>
+          <div><select id="projectSelect"></select><button id="shareProjectBtn" class="button">共享管理</button></div>
+        </div>
+        <section id="sharePanel" class="share-panel hidden">
+          <div class="share-head"><div><strong>共享成员</strong><small>含所有者最多 6 人</small></div><button id="closeSharePanel" class="icon-button">×</button></div>
+          <div class="invite-row">
+            <input id="inviteEmail" type="email" autocomplete="email" placeholder="成员邮箱" />
+            <select id="inviteRole"><option value="editor">可编辑</option><option value="viewer">只读</option></select>
+            <button id="inviteMemberBtn" class="button primary">添加</button>
+          </div>
+          <div id="memberList" class="member-list"></div>
+          <button id="shareLinkBtn" class="button wide ghost">分享论文链接</button>
+        </section>
         <div class="sync-state"><span id="cloudDot" class="dot"></span><span id="cloudStatus">尚未同步</span></div>
-        <div class="sync-actions">
+        <div id="syncActions" class="sync-actions">
           <button id="uploadProjectBtn" class="button primary">上传本机项目</button>
           <button id="downloadProjectBtn" class="button">下载云端项目</button>
         </div>

@@ -43,6 +43,9 @@ let cloudSyncInFlight = false;
 let productionMode = false;
 let demoMode = false;
 let mobileView = localStorage.getItem("knut-mobile-view") || "files";
+let projects = [];
+let activeProjectId = localStorage.getItem("knut-active-project") || "";
+let activeProjectRole = "";
 let softWrap = localStorage.getItem("knut-soft-wrap") !== "false";
 let contextFile = "";
 let pdfLoadToken = 0;
@@ -75,14 +78,17 @@ function updateAccountView(){
   $("accountBtn").textContent=cloudUser?`☁ ${cloudUser.email||"已登录"}`:"☁ 登录 / 同步";
   if(cloudUser)$("accountEmail").textContent=cloudUser.email||cloudUser.id;
   demoMode=productionMode&&!cloudUser;
+  const readOnly=demoMode||activeProjectRole==="viewer";
   $("welcomeState").classList.add("hidden");
-  editor.readOnly=demoMode;
-  $("saveBtn").disabled=demoMode;
-  $("compileBtn").disabled=demoMode;
-  $("commentBtn").disabled=demoMode;
-  document.querySelectorAll(".ai-actions button").forEach(button=>button.disabled=demoMode);
-  $("aiPrompt").disabled=demoMode;
-  $("sendAiPrompt").disabled=demoMode;
+  editor.readOnly=readOnly;
+  $("saveBtn").disabled=readOnly;
+  $("compileBtn").disabled=readOnly;
+  $("commentBtn").disabled=readOnly;
+  document.querySelectorAll(".ai-actions button").forEach(button=>button.disabled=readOnly);
+  $("aiPrompt").disabled=readOnly;
+  $("sendAiPrompt").disabled=readOnly;
+  $("projectRow").classList.toggle("hidden",!productionMode||!cloudUser);
+  $("syncActions").classList.toggle("hidden",productionMode);
 }
 function setMobileView(view,{persist=true}={}){
   if(!["files","editor","pdf"].includes(view))view="files";
@@ -109,12 +115,15 @@ async function initCloud(){
     }});
     const {data,error}=await supabase.auth.getSession();
     if(error)throw error;
-    cloudUser=data.session?.user||null;cloudAccessToken=data.session?.access_token||"";updateAccountView();
+    cloudUser=data.session?.user||null;cloudAccessToken=data.session?.access_token||"";
+    if(cloudUser&&productionMode)await loadProjects();
+    updateAccountView();
     if(cloudUser)setCloudStatus("已恢复登录，可同步","ok");
-    supabase.auth.onAuthStateChange((_event,session)=>{
+    supabase.auth.onAuthStateChange(async(_event,session)=>{
       const wasSignedIn=!!cloudUser;
       cloudUser=session?.user||null;cloudAccessToken=session?.access_token||"";updateAccountView();
       if(cloudUser){
+        if(productionMode)await loadProjects();
         setCloudStatus("已登录，可同步","ok");
         if(!wasSignedIn){activeFile="";original="";loadFiles();reloadPdf();}
       }else if(wasSignedIn){
@@ -140,6 +149,7 @@ async function googleLogin(){
 }
 async function signOut(){ if(!supabase)return; await supabase.auth.signOut(); cloudUser=null;cloudAccessToken="";activeFile="";original="";editor.value="";updateAccountView();setCloudStatus("游客只读模板");syncHighlight();loadFiles();reloadPdf(); }
 async function cloudUpsertFiles(files,{quiet=false}={}){
+  if(productionMode)return true;
   if(!supabase||!cloudUser||!files.length)return false;
   const rows=files.map(file=>({user_id:cloudUser.id,project_id:CLOUD_PROJECT,path:file.path,content:file.content,device_id:localDeviceId()}));
   for(let index=0;index<rows.length;index+=5){
@@ -160,6 +170,7 @@ function localDeviceId(){
   return id;
 }
 async function uploadProject(){
+  if(productionMode)return toast("服务器项目会自动跨设备保存，无需手动上传");
   if(!cloudUser)return toast("请先登录");
   if(cloudSyncInFlight)return;
   setCloudBusy(true);setCloudStatus("正在上传本机项目…","warn");
@@ -171,6 +182,7 @@ async function uploadProject(){
   finally{setCloudBusy(false);}
 }
 async function downloadProject(){
+  if(productionMode)return toast("服务器项目会自动跨设备载入，无需手动下载");
   if(!cloudUser)return toast("请先登录");
   if(cloudSyncInFlight)return;
   setCloudBusy(true);setCloudStatus("正在读取云端项目…","warn");
@@ -186,6 +198,43 @@ async function downloadProject(){
   finally{setCloudBusy(false);}
 }
 async function cloudSaveCurrent(path,content){ if(cloudUser&&!cloudSyncInFlight)await cloudUpsertFiles([{path,content}],{quiet:true}); }
+async function loadProjects(){
+  if(!cloudUser||!productionMode)return;
+  const data=await api("/api/projects");
+  projects=data.projects||[];
+  if(!projects.some(project=>project.project_id===activeProjectId))activeProjectId=projects[0]?.project_id||"";
+  localStorage.setItem("knut-active-project",activeProjectId);
+  const select=$("projectSelect");select.innerHTML="";
+  projects.forEach(project=>{const option=document.createElement("option");option.value=project.project_id;option.textContent=`${project.project_name} · ${project.member_role}`;select.appendChild(option);});
+  select.value=activeProjectId;
+  activeProjectRole=projects.find(project=>project.project_id===activeProjectId)?.member_role||"";
+  $("shareProjectBtn").classList.toggle("hidden",activeProjectRole!=="owner");
+  updateAccountView();
+}
+async function loadMembers(){
+  if(activeProjectRole!=="owner")return;
+  const data=await api("/api/project-members");
+  const list=$("memberList");list.innerHTML="";
+  (data.members||[]).forEach(member=>{
+    const item=document.createElement("div");item.className="member-item";
+    const identity=document.createElement("div");identity.className="member-email";identity.textContent=member.email;
+    const state=document.createElement("small");state.textContent=member.accepted?"已加入":"等待登录";identity.appendChild(state);
+    if(member.member_role==="owner"){
+      const label=document.createElement("span");label.textContent="所有者";item.append(identity,label,document.createElement("span"));
+    }else{
+      const role=document.createElement("select");role.innerHTML='<option value="editor">可编辑</option><option value="viewer">只读</option>';role.value=member.member_role;
+      role.onchange=async()=>{try{await api("/api/project-members",{method:"PATCH",body:JSON.stringify({memberId:member.member_id,role:role.value})});toast("权限已更新");}catch(error){toast(error.message);}};
+      const remove=document.createElement("button");remove.textContent="移除";remove.onclick=async()=>{if(!confirm(`移除 ${member.email}？`))return;try{await api("/api/project-members",{method:"DELETE",body:JSON.stringify({memberId:member.member_id})});await loadMembers();}catch(error){toast(error.message);}};
+      item.append(identity,role,remove);
+    }
+    list.appendChild(item);
+  });
+}
+async function inviteMember(){
+  const email=$("inviteEmail").value.trim();if(!email)return toast("请输入成员邮箱");
+  try{await api("/api/project-members",{method:"POST",body:JSON.stringify({email,role:$("inviteRole").value})});$("inviteEmail").value="";await loadMembers();toast("成员已添加，请把论文链接发给对方");}
+  catch(error){toast(error.message);}
+}
 function setStatus(message, type="") { $("status").textContent=message; $("saveDot").className=`dot ${type}`; }
 function applyEditorColors(colors,save=true){
   editorColors={...editorColors,...colors}; const root=document.documentElement;
@@ -268,7 +317,7 @@ function syncEditorChrome(){
 }
 function syncHighlight(){ highlightLatex(editor.value); highlightLayer.scrollTop=editor.scrollTop; highlightLayer.scrollLeft=editor.scrollLeft; syncEditorChrome(); }
 async function api(url,options={}){
-  const headers={"Content-Type":"application/json",...(cloudAccessToken?{Authorization:`Bearer ${cloudAccessToken}`}:{}),...(options.headers||{})};
+  const headers={"Content-Type":"application/json",...(cloudAccessToken?{Authorization:`Bearer ${cloudAccessToken}`}:{}),...(activeProjectId?{"X-Knut-Project":activeProjectId}:{}),...(options.headers||{})};
   const response=await fetch(url,{...options,headers});
   const data=await response.json();
   if(!response.ok)throw new Error(data.error||"请求失败");
@@ -281,7 +330,7 @@ function displayFileName(file) {
 }
 async function loadFiles() {
   try { const data=await api(demoMode?"/api/demo/files":"/api/files"); $("projectPath").textContent=data.projectRoot; $("projectPath").title=data.projectRoot; const tree=$("fileTree"); tree.innerHTML="";
-    data.files.forEach(file=>{ const button=document.createElement("button"); button.className=`file-item${file===activeFile?" active":""}`; button.dataset.file=file; button.title=file; button.innerHTML=`<span class="icon">${fileIcon(file)}</span><span>${displayFileName(file)}</span>`; button.onclick=()=>openFile(file); if(!demoMode)button.oncontextmenu=event=>showFileContextMenu(event,file); tree.appendChild(button); });
+    data.files.forEach(file=>{ const button=document.createElement("button"); button.className=`file-item${file===activeFile?" active":""}`; button.dataset.file=file; button.title=file; button.innerHTML=`<span class="icon">${fileIcon(file)}</span><span>${displayFileName(file)}</span>`; button.onclick=()=>openFile(file); if(!demoMode&&activeProjectRole!=="viewer")button.oncontextmenu=event=>showFileContextMenu(event,file); tree.appendChild(button); });
     setStatus(demoMode?"游客只读模板 · 登录后可编辑":"已连接个人项目",demoMode?"warn":"ok"); if(!activeFile&&data.files.includes("KNUT-Thesis-Files/manuscript.tex")) openFile("KNUT-Thesis-Files/manuscript.tex");
   } catch(error){ setStatus(error.message,"error"); }
 }
@@ -307,11 +356,11 @@ async function renameContextFile(){
 }
 async function openFile(file) {
   if(setDirty()&&!(await autoSave({silent:true})))return;
-  try { setStatus("正在读取…"); const data=await api(`${demoMode?"/api/demo/file":"/api/file"}?path=${encodeURIComponent(file)}`); activeFile=file; original=data.content; editor.value=data.content; syncHighlight(); editor.disabled=false;editor.readOnly=demoMode; $("activeFile").textContent=`${displayFileName(file)}${demoMode?" · 只读":""}`; document.querySelectorAll(".file-item").forEach(el=>el.classList.toggle("active",el.dataset.file===file)); updateSelection(); setStatus(demoMode?"游客只读模板 · 登录后可编辑":"文件已载入",demoMode?"warn":"ok"); if(matchMedia("(max-width:700px)").matches)setMobileView("editor"); }
+  try { setStatus("正在读取…"); const data=await api(`${demoMode?"/api/demo/file":"/api/file"}?path=${encodeURIComponent(file)}`); activeFile=file; original=data.content; editor.value=data.content; syncHighlight(); editor.disabled=false;editor.readOnly=demoMode||activeProjectRole==="viewer"; $("activeFile").textContent=`${displayFileName(file)}${demoMode||activeProjectRole==="viewer"?" · 只读":""}`; document.querySelectorAll(".file-item").forEach(el=>el.classList.toggle("active",el.dataset.file===file)); updateSelection(); setStatus(demoMode?"游客只读模板 · 登录后可编辑":activeProjectRole==="viewer"?"共享项目 · 只读权限":"文件已载入",demoMode||activeProjectRole==="viewer"?"warn":"ok"); if(matchMedia("(max-width:700px)").matches)setMobileView("editor"); }
   catch(error){ toast(error.message); setStatus("读取失败","error"); }
 }
 async function autoSave({silent=false}={}){
-  if(demoMode)return true;
+  if(demoMode||activeProjectRole==="viewer")return true;
   if(!activeFile||editor.value===original)return true;
   if(autoSaveInFlight)return autoSaveInFlight;
   const fileAtStart=activeFile,contentAtStart=editor.value;
@@ -336,7 +385,7 @@ function emergencySave(){
   return true;
 }
 async function saveFile() {
-  if(demoMode)return toast("游客模式只能查看模板，请登录后编辑");
+  if(demoMode||activeProjectRole==="viewer")return toast("当前是只读权限，不能修改");
   if(!activeFile) return toast("请先选择文件");
   try { setStatus("正在保存并编译…","warn"); const data=await api("/api/file",{method:"PUT",body:JSON.stringify({path:activeFile,content:editor.value,compile:true})}); original=editor.value; setDirty(); await cloudSaveCurrent(activeFile,editor.value); handleCompile(data.compile); toast(cloudUser?"已保存到本地并同步云端":"已保存到本地文件"); }
   catch(error){ setStatus("保存失败","error"); toast(error.message); }
@@ -429,7 +478,7 @@ function jumpToSourceLine(line){
 }
 function updateSelection(){ const count=Math.max(0,editor.selectionEnd-editor.selectionStart); $("selectionCount").textContent=`${count} 字`; }
 function toggleComment(){
-  if(demoMode)return toast("游客模式只能查看模板，请登录后编辑");
+  if(demoMode||activeProjectRole==="viewer")return toast("当前是只读权限，不能修改");
   if(!activeFile)return toast("请先选择文件");
   const value=editor.value,start=editor.selectionStart,end=editor.selectionEnd;
   const effectiveEnd=end>start&&value[end-1]==="\n"?end-1:end;
@@ -458,7 +507,7 @@ function applySoftWrap(){
   localStorage.setItem("knut-soft-wrap",String(softWrap)); syncHighlight();
 }
 async function runAi(action,instruction=""){
-  if(demoMode)return toast("游客模式只能查看模板，请登录后使用 AI");
+  if(demoMode||activeProjectRole==="viewer")return toast("当前是只读权限，不能使用 AI");
   if(!activeFile) return toast("请先选择文件"); const start=editor.selectionStart,end=editor.selectionEnd,text=editor.value.slice(start,end); if(!text.trim()) return toast("请先在正文中选择需要处理的文字");
   aiSelection={start,end}; try{ setStatus("AI 正在处理选中文字…","warn"); document.querySelectorAll(".ai-actions button").forEach(b=>b.disabled=true); $("sendAiPrompt").disabled=true; $("aiPrompt").disabled=true; const data=await api("/api/ai",{method:"POST",body:JSON.stringify({action,text,file:activeFile,instruction})}); $("aiResult").value=data.text; $("aiReview").classList.remove("hidden"); setStatus("AI 建议已生成，请检查","ok"); }
   catch(error){ toast(error.message); setStatus("AI 请求未完成","error"); }
@@ -490,6 +539,11 @@ $("closeAccountModal").onclick=()=>$("accountModal").classList.add("hidden");
 $("accountModal").addEventListener("click",event=>{if(event.target===$("accountModal"))$("accountModal").classList.add("hidden");});
 $("emailLoginBtn").onclick=emailLogin;$("googleLoginBtn").onclick=googleLogin;$("signOutBtn").onclick=signOut;
 $("uploadProjectBtn").onclick=uploadProject;$("downloadProjectBtn").onclick=downloadProject;
+$("projectSelect").onchange=async()=>{activeProjectId=$("projectSelect").value;localStorage.setItem("knut-active-project",activeProjectId);activeProjectRole=projects.find(project=>project.project_id===activeProjectId)?.member_role||"";activeFile="";original="";editor.value="";$("sharePanel").classList.add("hidden");updateAccountView();await loadFiles();reloadPdf();};
+$("shareProjectBtn").onclick=async()=>{$("sharePanel").classList.remove("hidden");await loadMembers();};
+$("closeSharePanel").onclick=()=>$("sharePanel").classList.add("hidden");
+$("inviteMemberBtn").onclick=inviteMember;
+$("shareLinkBtn").onclick=async()=>{const share={title:"KNUT Thesis Studio",text:"我邀请你协作编辑 KNUT 论文，请使用受邀邮箱登录。",url:location.origin};if(navigator.share){try{await navigator.share(share);return;}catch{}}window.prompt("复制下面的论文链接并发送给成员：",location.origin);};
 setInterval(()=>autoSave(),AUTO_SAVE_INTERVAL);
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")emergencySave();});
 window.addEventListener("pagehide",emergencySave);
