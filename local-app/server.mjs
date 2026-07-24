@@ -89,6 +89,37 @@ async function updateProjectReferences(oldRelativePath, newRelativePath) {
   return updated;
 }
 
+function normalizeLocatorText(value) {
+  return String(value || "").normalize("NFKC").toLowerCase()
+    .replace(/[‐‑‒–—―]/g, "-")
+    .replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
+async function findSelectedTextSource(selectedText, fallbackPath, fallbackLine) {
+  const needle = normalizeLocatorText(selectedText).slice(0, 600);
+  if (needle.length < 3) return null;
+  let best = null;
+  for (const relativeFile of await listFiles()) {
+    if (!relativeFile.toLowerCase().endsWith(".tex")) continue;
+    let content;
+    try { content = await fs.readFile(safeProjectPath(relativeFile), "utf8"); } catch { continue; }
+    const lines = content.split(/\r?\n/);
+    for (let index = 0; index < lines.length; index++) {
+      const windowText = lines.slice(index, index + 5).join(" ");
+      const normalizedWindow = normalizeLocatorText(windowText);
+      if (!normalizedWindow.includes(needle)) continue;
+      const exactOffset = lines.slice(index, index + 5).findIndex(line => normalizeLocatorText(line).includes(needle));
+      const lineNumber = index + (exactOffset >= 0 ? exactOffset : 0) + 1;
+      const sameFileBonus = relativeFile.toLowerCase() === fallbackPath.toLowerCase() ? 3000 : 0;
+      const compactness = Math.max(0, 2000 - (normalizedWindow.length - needle.length));
+      const distancePenalty = relativeFile === fallbackPath ? Math.abs(lineNumber - fallbackLine) : 0;
+      const score = sameFileBonus + compactness - distancePenalty;
+      if (!best || score > best.score) best = { path: relativeFile, line: lineNumber, score };
+    }
+  }
+  return best;
+}
+
 function findCommand(command) {
   const preferredFolders = [
     process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, "Programs", "MiKTeX", "miktex", "bin", "x64"),
@@ -243,7 +274,14 @@ const server = http.createServer(async (req, res) => {
       const absoluteInput = path.isAbsolute(inputPath) ? path.resolve(inputPath) : path.resolve(projectRoot, inputPath);
       if (absoluteInput !== projectRoot && !absoluteInput.startsWith(projectRoot + path.sep)) throw new Error("定位结果不在当前论文项目中");
       const relativeInput = path.relative(projectRoot, absoluteInput).replaceAll(path.sep, "/");
-      return json(res, 200, { ok: true, path: relativeInput, line: Math.max(1, Number(lineMatch[1])) });
+      const synctexLine = Math.max(1, Number(lineMatch[1]));
+      const textMatch = await findSelectedTextSource(body.text, relativeInput, synctexLine);
+      return json(res, 200, {
+        ok: true,
+        path: textMatch?.path || relativeInput,
+        line: textMatch?.line || synctexLine,
+        method: textMatch ? "text" : "synctex",
+      });
     }
     if (req.method === "POST" && url.pathname === "/api/compile") return json(res, 200, await compileLatex());
     if (req.method === "POST" && url.pathname === "/api/ai") return json(res, 200, { text: await aiEdit(await readJson(req)) });
