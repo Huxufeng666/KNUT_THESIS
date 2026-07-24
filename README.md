@@ -1,33 +1,210 @@
-# KNUT_THESIS
+# KNUT Thesis Studio
 
-This is the unofficial template for the Korea National University of Transportation (KNUT) thesis.
+这是一个适用于韩国国立交通大学（KNUT）学位论文的 LaTeX 模板，并附带一个可在 Windows 电脑本地运行的网页论文编辑器。
 
-File Structures and Contents
----
+编辑器会直接读取和修改项目中的真实 `.tex` 文件。保存并编译后，可以在网页右侧立即预览生成的 PDF。论文文件、API Key 和编辑内容默认都保存在本机。
 
-Each of the files and directories in the template as described as below:
+## 主要功能
 
-- `manuscript.tex`: It contains the main tex code including the imports, variables, and combining the abstract and all the pages
-- *frontmatter*: The dimensions of the front cover pages are different from those of the rest of the thesis, so there is a separate Tex file, `frontmatter.tex`. First, you need to update this text file and generate the PDF file in the same directory for direct usage in the main thesis file. 
-- *titlePages*: This directory contains the rest of the title pages, and as the dimensions of these pages as the same as the main thesis, there is no need to generate the pdf, these files are directly imported in the main thesis file
-- *abstract*: This directory contains the abstract of the thesis both in English and Korean
-- *chapters*: This directory contains the individual chapters in the thesis. These chapters are then imported and compiled in the main `manuscript.tex` file
-- *figures*: This directory contains all the necessary graphics and figures used in the thesis. 
-- `references.bib`: This file contains all the citations used in the thesis
---- 
+- LaTeX 语法高亮、行号、自动换行和编辑器配色
+- 左侧编辑源码，右侧预览 PDF
+- `Ctrl + S` 保存文件并编译 PDF
+- 每 2 分钟自动保存
+- 页面隐藏、刷新或意外退出时尝试紧急保存
+- `Ctrl + /` 添加或取消 LaTeX `%` 注释
+- 在文件列表中右键修改文件名
+- 点击 PDF 内容，根据 SyncTeX 定位到对应的源码文件和行
+- AI 学术润色、扩写、精简、翻译英文和翻译中文
 
-Usage
----
-Download the repository as a zip file and import it in [Overleaf](https://www.overleaf.com/project/#) for updating the latex text in Overleaf.
+## 一、首次使用前需要安装
 
-- first update the `title.tex` and `title2.text`, to update the contents of the front cover pages, and then compile the `frontmatter.tex` to generate the `frontmatter.pdf` pdf, save it in the same directory, as this file is directly imported in the main text file
-- update the titlePages and the rest of the contents in the chapters and abstract
-- save all the figures in the figures directory 
-- put all your citations in the `references.bib` file
-- compile the `manuscript.tex`, your thesis is ready to be print
----
+### 1. 安装 Node.js
 
-TODO
----
-- all the fonts used in this thesis are the default ones, for better results and to match with the university template, change the fonts and their sizes accordingly
+从 [Node.js 官网](https://nodejs.org/) 下载并安装 LTS 版本。安装完成后重新打开终端，执行：
 
+```powershell
+node --version
+```
+
+如果能看到版本号，说明安装成功。本项目的本地编辑器不需要执行 `npm install`。
+
+### 2. 安装 MiKTeX
+
+从 [MiKTeX 官网](https://miktex.org/download) 下载并安装 Windows 版本。推荐使用当前用户安装。
+
+打开 **MiKTeX Console** 后：
+
+1. 进入 `Updates`，点击 `Check for updates`，然后安装全部更新。
+2. 进入 `Settings`。
+3. 将缺少宏包时自动安装设置为 `Always` 或 `Ask me first`。
+
+编辑器使用 XeLaTeX 编译论文，并会在需要时运行 Biber。
+
+## 二、启动本地论文编辑器
+
+1. 下载或克隆本项目。
+2. 进入项目根目录。
+3. 双击 `start-knut-editor.vbs`。
+4. 稍等几秒，浏览器会自动打开：
+
+```text
+http://127.0.0.1:4173
+```
+
+推荐使用 `start-knut-editor.vbs`，它不会显示命令窗口。`start-knut-editor.cmd` 也可以启动，但可能会短暂显示命令窗口。
+
+如果浏览器没有自动打开，可以手动访问上面的地址。关闭启动的后台进程或重启电脑后，本地服务会停止。
+
+## 三、编辑和编译论文
+
+网页打开后：
+
+1. 在左侧文件列表选择一个 `.tex` 或 `.bib` 文件。
+2. 在中间编辑区修改内容。
+3. 点击右上角 **保存并编译**，或按 `Ctrl + S`。
+4. 编译成功后，右侧 PDF 会自动刷新。
+
+仅输入文字不会立即改变右侧 PDF。PDF 是 LaTeX 编译结果，所以必须完成“保存并编译”后才会更新。
+
+### 自动保存
+
+- 编辑器每 2 分钟自动保存一次当前修改。
+- 页面切换到后台、刷新或意外退出时，会尝试进行紧急保存。
+- 自动保存只保存源文件，不自动编译 PDF。
+- 如果关闭网页时仍有未保存内容，浏览器才会显示离开确认。
+
+## 四、常用快捷键
+
+| 快捷键 | 功能 |
+| --- | --- |
+| `Ctrl + S` | 保存当前文件并编译 PDF |
+| `Ctrl + /` | 添加或取消当前行/选中行的 LaTeX `%` 注释 |
+| `Ctrl + Enter` | 在 AI 自定义要求输入框中提交请求 |
+
+## 五、PDF 与源码定位
+
+编译时项目会生成 SyncTeX 数据。编译成功后，点击右侧 PDF 中的文字或页面位置，编辑器会尝试：
+
+1. 找到对应的 `.tex` 文件；
+2. 自动打开该文件；
+3. 跳转到对应行并定位光标。
+
+以下情况可能无法准确定位：
+
+- PDF 还没有使用当前编辑器重新编译；
+- 点击的是图片、空白区域或扫描内容；
+- 当前显示的是项目自带的旧 PDF；
+- 编译失败，没有生成最新的 SyncTeX 文件。
+
+遇到这种情况，请先点击一次 **保存并编译**，再重新点击 PDF。
+
+## 六、修改文件名
+
+在左侧文件列表中右键目标文件，然后选择重命名。编辑器会尝试同步更新项目内花括号中的文件引用。
+
+注意：
+
+- `manuscript.tex` 是主入口文件，不能重命名。
+- 重命名后应立即保存并编译，检查所有 `\input`、`\include` 和资源路径是否正确。
+- 不建议随意更改文件扩展名。
+
+## 七、配置 AI 学术助手
+
+AI 功能需要 OpenAI API Key。ChatGPT 订阅和 API 计费是两个独立服务。
+
+### 1. 获取 API Key
+
+登录 [OpenAI API 平台](https://platform.openai.com/api-keys)，创建一个新的 Secret Key。密钥通常以 `sk-` 开头，只会完整显示一次，请妥善保存。
+
+### 2. 创建本地配置
+
+复制：
+
+```text
+local-app/.env.example
+```
+
+并将副本命名为：
+
+```text
+local-app/.env
+```
+
+编辑 `.env`：
+
+```dotenv
+OPENAI_API_KEY=sk-你的密钥
+OPENAI_MODEL=gpt-5.6-terra
+PORT=4173
+```
+
+保存后重新启动编辑器。`.env` 已被 Git 忽略，不要把 API Key 提交到 GitHub，也不要截图或发送给其他人。
+
+### 3. 使用 AI
+
+1. 在编辑器中选中需要处理的论文内容。
+2. 点击“学术润色”“扩写”“精简”“译为英文”或“译为中文”。
+3. 也可以输入自定义要求，然后按 `Ctrl + Enter`。
+4. 检查 AI 返回的内容，确认后再应用到论文。
+
+AI 生成内容可能存在事实、引用或格式错误，正式提交论文前必须人工核对。
+
+## 八、论文文件说明
+
+| 路径 | 用途 |
+| --- | --- |
+| `manuscript.tex` | 论文主入口和全局宏包配置 |
+| `frontmatters/` | 前置页面及封面相关内容 |
+| `titlePages/` | 标题页 |
+| `abstract/` | 英文和韩文摘要 |
+| `chapters/` | 各论文章节 |
+| `figures/` | 图片和图表资源 |
+| `references.bib` | BibLaTeX/Biber 参考文献数据库 |
+| `local-app/` | 本地网页编辑器程序 |
+
+通常应先修改标题、作者、学校、专业和日期信息，再编辑摘要、章节与参考文献，最后编译 `manuscript.tex`。
+
+## 九、常见问题
+
+### 页面显示“尚未安装编译器”
+
+说明编辑器没有找到 XeLaTeX。请确认 MiKTeX 已安装，并在 MiKTeX Console 中完成更新。完成后关闭编辑器并重新启动。
+
+### `latexmk.exe did not succeed` 或提示未检查 MiKTeX 更新
+
+打开 MiKTeX Console，依次执行：
+
+1. `Updates` → `Check for updates`
+2. 安装全部更新
+3. `Tasks` → `Refresh file name database`
+4. `Tasks` → `Refresh font map files`
+
+然后重新启动编辑器并再次编译。
+
+### 左边修改了，右边 PDF 没变化
+
+请按 `Ctrl + S` 或点击 **保存并编译**。自动保存不会自动编译。如果编译失败，右侧会继续显示上一次成功生成的 PDF，请查看页面上的编译错误信息。
+
+### 启动后页面空白或一直显示“正在连接本地项目”
+
+请检查：
+
+- Node.js 是否已正确安装；
+- 是否从完整项目目录中启动；
+- `4173` 端口是否被其他程序占用；
+- 防火墙或安全软件是否阻止了 Node.js；
+- 是否已经有另一个编辑器实例在运行。
+
+### 中文或韩文显示异常
+
+本项目使用 XeLaTeX。请确认系统中已安装论文需要的中文、韩文字体，并检查 LaTeX 文件中的字体配置是否与本机字体名称一致。
+
+## 十、安全说明
+
+- 本地服务默认只监听 `127.0.0.1`，供当前电脑使用。
+- 不要把 `.env`、API Key 或其他密码提交到 GitHub。
+- 提交论文前请备份整个项目，并人工检查 PDF、引用、字体、页码和学校格式要求。
+
+## 许可证
+
+本项目采用 [MIT License](LICENSE)。
