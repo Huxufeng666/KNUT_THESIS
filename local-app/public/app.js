@@ -53,6 +53,9 @@ function updateAccountView(){
   $("signedInView").classList.toggle("hidden",!cloudUser);
   $("accountBtn").textContent=cloudUser?`☁ ${cloudUser.email||"已登录"}`:"☁ 登录 / 同步";
   if(cloudUser)$("accountEmail").textContent=cloudUser.email||cloudUser.id;
+  const showWelcome=productionMode&&!cloudUser;
+  $("welcomeState").classList.toggle("hidden",!showWelcome);
+  if(showWelcome)editor.disabled=true;
 }
 async function initCloud(){
   try{
@@ -438,6 +441,7 @@ window.addEventListener("scroll",hideFileContextMenu,true);
 $("cancelAi").onclick=()=>{$("aiReview").classList.add("hidden");aiSelection=null;}; $("applyAi").onclick=applyAi; document.querySelectorAll(".ai-actions button").forEach(button=>button.onclick=()=>runAi(button.dataset.action));
 $("sendAiPrompt").onclick=runCustomAi; $("aiPrompt").addEventListener("keydown",event=>{if(event.key==="Enter"&&(event.ctrlKey||event.metaKey)){event.preventDefault();runCustomAi();}});
 $("accountBtn").onclick=()=>$("accountModal").classList.remove("hidden");
+$("welcomeLoginBtn").onclick=()=>$("accountModal").classList.remove("hidden");
 $("closeAccountModal").onclick=()=>$("accountModal").classList.add("hidden");
 $("accountModal").addEventListener("click",event=>{if(event.target===$("accountModal"))$("accountModal").classList.add("hidden");});
 $("emailLoginBtn").onclick=emailLogin;$("googleLoginBtn").onclick=googleLogin;$("signOutBtn").onclick=signOut;
@@ -454,7 +458,7 @@ async function boot(){
     if(response.ok)productionMode=(await response.json()).mode==="production";
   }catch{}
   await initCloud();
-  if(!productionMode||cloudUser){reloadPdf();loadFiles();}
+  if(!productionMode||cloudUser){$("welcomeState").classList.add("hidden");reloadPdf();loadFiles();}
   else{setStatus("请登录后打开论文项目","warn");$("pdfPages").innerHTML='<div class="pdf-loading">请先登录以载入个人论文 PDF</div>';}
 }
 boot();

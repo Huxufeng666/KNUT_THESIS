@@ -44,6 +44,13 @@
         <div class="selection-meta"><span id="selectionCount">0 字</span><button id="wrapBtn" class="mini-tool active" title="切换长行自动换行">↵ 自动换行</button><button id="commentBtn" class="mini-tool" title="切换 LaTeX 行注释">% 注释 <kbd>Ctrl /</kbd></button></div>
       </div>
       <div class="code-editor">
+        <div id="welcomeState" class="welcome-state hidden">
+          <div class="welcome-mark">K</div>
+          <h2>欢迎使用 KNUT Thesis Studio</h2>
+          <p>登录后会自动创建一份独立的 KNUT 论文模板，你可以直接编辑、保存并编译 PDF。</p>
+          <div class="welcome-steps"><span>1. 登录账号</span><span>2. 编辑模板</span><span>3. 保存并编译</span></div>
+          <button id="welcomeLoginBtn" class="button primary">登录并开始写作</button>
+        </div>
         <div id="lineNumbers" aria-hidden="true"></div>
         <div id="activeLine" aria-hidden="true"></div>
         <pre id="highlightLayer" aria-hidden="true"></pre>

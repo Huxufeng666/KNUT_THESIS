@@ -67,10 +67,17 @@ async function ensureWorkspace(userId) {
     const root = userRoot(userId);
     await fs.mkdir(root, { recursive: true, mode: 0o700 });
     const marker = path.join(root, ".initialized");
-    if (!fsSync.existsSync(marker)) {
+    const mainTex = path.join(root, mainTexRelative);
+    if (!fsSync.existsSync(marker) || !fsSync.existsSync(mainTex)) {
       for (const entry of templateEntries) {
         const source = path.join(templateRoot, entry);
-        if (fsSync.existsSync(source)) await fs.cp(source, path.join(root, entry), { recursive: true });
+        if (fsSync.existsSync(source)) {
+          await fs.cp(source, path.join(root, entry), {
+            recursive: true,
+            force: false,
+            errorOnExist: false,
+          });
+        }
       }
       await fs.writeFile(marker, new Date().toISOString(), { mode: 0o600 });
     }
