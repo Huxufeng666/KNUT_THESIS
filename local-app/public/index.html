@@ -10,7 +10,7 @@
   <header class="topbar">
     <div class="brand"><span class="mark">K</span><div><strong>KNUT Thesis Studio</strong><small>本地论文工作台</small></div></div>
     <div class="document-status"><span id="saveDot" class="dot"></span><span id="status">正在连接本地项目…</span></div>
-    <div class="top-actions"><button id="accountBtn" class="button ghost">☁ 登录 / 同步</button><button id="colorSettingsBtn" class="button ghost">◐ 编辑器配色</button><button id="compileBtn" class="button ghost">编译 PDF</button><button id="saveBtn" class="button primary">保存并编译 <kbd>Ctrl S</kbd></button></div>
+    <div class="top-actions"><label class="language-control" for="languageSelect"><span>Language</span><select id="languageSelect" aria-label="System language"><option value="zh">中文</option><option value="en">English</option><option value="ko">한국어</option></select></label><button id="accountBtn" class="button ghost">☁ 登录 / 同步</button><button id="colorSettingsBtn" class="button ghost">◐ 编辑器配色</button><button id="compileBtn" class="button ghost">编译 PDF</button><button id="saveBtn" class="button primary">保存并编译 <kbd>Ctrl S</kbd></button></div>
   </header>
   <nav id="mobileNav" class="mobile-nav" aria-label="手机页面切换">
     <button data-mobile-view="files" class="active">☰ 文件</button>
@@ -127,6 +127,7 @@
     </section>
   </div>
   <div id="toast" class="toast"></div>
+  <script src="/i18n.js"></script>
   <script type="module" src="/app.js"></script>
 </body>
 </html>
