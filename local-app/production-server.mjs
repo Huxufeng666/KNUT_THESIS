@@ -109,7 +109,7 @@ async function ensureWorkspace(projectId, ownerUserId, isOwner) {
       await fs.writeFile(marker, new Date().toISOString(), { mode: 0o600 });
     }
     return root;
-  })().finally(() => workspacePromises.delete(userId));
+  })().finally(() => workspacePromises.delete(projectId));
   workspacePromises.set(projectId, promise);
   return promise;
 }
