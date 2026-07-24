@@ -1,4 +1,23 @@
-import * as pdfjsLib from "/vendor/pdfjs/pdf.mjs";
+if(typeof ReadableStream!=="undefined"){
+  const streamPrototype=ReadableStream.prototype;
+  const streamValues=async function*(){
+    const reader=this.getReader();
+    try{
+      while(true){
+        const {done,value}=await reader.read();
+        if(done)return;
+        yield value;
+      }
+    }finally{
+      reader.releaseLock();
+    }
+  };
+  if(typeof streamPrototype.values!=="function")Object.defineProperty(streamPrototype,"values",{value:streamValues,configurable:true,writable:true});
+  if(typeof Symbol!=="undefined"&&Symbol.asyncIterator&&!streamPrototype[Symbol.asyncIterator]){
+    Object.defineProperty(streamPrototype,Symbol.asyncIterator,{value:streamValues,configurable:true,writable:true});
+  }
+}
+const pdfjsLib=await import("/vendor/pdfjs/pdf.mjs");
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/vendor/pdfjs/pdf.worker.mjs";
 
 const $ = (id) => document.getElementById(id);
